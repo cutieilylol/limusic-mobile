@@ -96,7 +96,57 @@ final class AppChrome: NSObject, ASWebAuthenticationPresentationContextProviding
             self, selector: #selector(keyboardChanged(_:)),
             name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
         configureWebViewWhenReady(attempt: 0)
+        #if DEBUG
+            runSmokeSteps()
+        #endif
     }
+
+    #if DEBUG
+        /// The iOS workflow's Simulator run (`LIMUSIC_SMOKE=1`): nobody is there to tap, so this
+        /// measures the layout, starts a song and walks the tabs, logging what it finds.
+        private func runSmokeSteps() {
+            guard ProcessInfo.processInfo.environment["LIMUSIC_SMOKE"] != nil else { return }
+            let go = { (path: String) in
+                "(()=>{const a=document.createElement('a');a.href='\(path)';document.body.appendChild(a);a.click();a.remove();return location.pathname})()"
+            }
+            let layout = """
+                JSON.stringify((()=>{const r=e=>{if(!e)return null;const b=e.getBoundingClientRect();return [Math.round(b.top),Math.round(b.bottom)]};\
+                const p=document.createElement('div');p.style.cssText='position:fixed;top:0;left:0;width:1px;height:100dvh;padding-bottom:env(safe-area-inset-bottom);padding-top:env(safe-area-inset-top);box-sizing:content-box';\
+                document.body.appendChild(p);const c=getComputedStyle(p);const o={dvh:p.clientHeight,top:c.paddingTop,bottom:c.paddingBottom};p.remove();\
+                return {ih:innerHeight,vv:visualViewport.height,ch:document.documentElement.clientHeight,probe:o,shell:r(document.querySelector('.h-dvh')),\
+                main:r(document.querySelector('main')),nav:r(document.querySelector('nav')),body:r(document.body),meta:document.querySelector('meta[name=viewport]').content,cls:document.documentElement.className}})())
+                """
+            let state = "JSON.stringify({path:location.pathname,text:document.body.innerText.slice(0,300)})"
+            let steps: [(Double, String)] = [
+                (20, layout),
+                (22, "(()=>{const r=document.querySelector('main [data-ctx][role=button]');r&&r.click();return r?r.innerText.slice(0,60):'no row'})()"),
+                (36, state),
+                (46, state),
+                (47, "(()=>{const b=document.querySelector('button[aria-label=\"Minimize player\"]');b&&b.click();return !!b})()"),
+                (50, go("/search")),
+                (55, go("/library")),
+                (60, state),
+            ]
+            for (delay, js) in steps {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    guard let web = self?.mainWebView() else {
+                        NSLog("SMOKE no webview")
+                        return
+                    }
+                    NSLog(
+                        "SMOKE t=%.0f frame=%@ super=%@ safe=%@", delay,
+                        NSCoder.string(for: web.frame),
+                        NSCoder.string(for: web.superview?.bounds ?? .zero),
+                        NSCoder.string(for: web.safeAreaInsets))
+                    web.evaluateJavaScript(js) { value, error in
+                        NSLog(
+                            "SMOKE t=%.0f result=%@ error=%@", delay,
+                            String(describing: value), String(describing: error))
+                    }
+                }
+            }
+        }
+    #endif
 
     /// The webview arrives from wry some time after launch; there is nothing to be notified by.
     private func configureWebViewWhenReady(attempt: Int) {
