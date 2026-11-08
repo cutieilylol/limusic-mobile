@@ -87,7 +87,7 @@
 <svelte:window onkeydown={(e) => open && e.key === 'Escape' && (open = false)} />
 
 <div
-	class="sticky top-0 z-10 flex items-center gap-3 border-b bg-background px-2 py-1.5 text-xs font-medium text-muted-foreground"
+	class="sticky top-0 z-10 flex items-center phone:hidden gap-3 border-b bg-background px-2 py-1.5 text-xs font-medium text-muted-foreground"
 >
 	{#if selecting}
 		<span class="w-4 shrink-0"></span>

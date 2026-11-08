@@ -23,7 +23,8 @@
 		ArrowUpDownIcon,
 		ComputerIcon,
 		SpotifyIcon,
-		Search01Icon
+		Search01Icon,
+		Download04Icon
 	} from '@hugeicons/core-free-icons';
 	import { Button } from '$lib/components/ui/button';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
@@ -51,6 +52,8 @@
 	import { rowWindow } from '$lib/rows';
 	import { rowScroller } from '$lib/rows.svelte';
 	import { t } from '$lib/i18n.svelte';
+	import { isPhone } from '$lib/mobile.svelte';
+	import { download } from '$lib/downloads.svelte';
 	import { imp, updateFromSpotify } from '$lib/import.svelte';
 	import {
 		SORTS,
@@ -1002,7 +1005,9 @@
 		<!-- One scroller for the whole page: the header scrolls away above the rows, same as the
 		     album page. -->
 		<div class="content-in min-h-0 flex-1 overflow-y-auto" {@attach sc.attach}>
-			<div class="relative flex min-h-[38vh] shrink-0 items-end gap-6 overflow-hidden p-6">
+			<!-- Phone: stacked and centred (cover, then title, details, controls), the layout YouTube
+			     Music's app gives a playlist; side by side there is no room for either. -->
+			<div class="relative flex min-h-[38vh] shrink-0 items-end gap-6 overflow-hidden p-6 phone:min-h-0 phone:flex-col phone:items-center phone:gap-4 phone:px-4 phone:pb-3 phone:pt-6 phone:text-center">
 				<!-- The backdrop and its fade share one layer (`art-wash` on the wrapper): see HomeHero. -->
 				<div class="art-wash pointer-events-none absolute inset-0 overflow-hidden">
 					{#if backdrop}
@@ -1023,17 +1028,17 @@
 				</div>
 				{#if isOnRepeat}
 					<div
-						class="relative flex h-40 w-40 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-lg"
+						class="relative flex h-40 w-40 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-lg phone:h-52 phone:w-52"
 					>
 						<HugeiconsIcon icon={ListRestartIcon} class="h-20 w-20" />
 					</div>
 				{:else if art}
-					<img src={art} alt="" class="relative h-40 w-40 rounded-xl object-cover shadow-lg" />
+					<img src={art} alt="" class="relative h-40 w-40 rounded-xl object-cover shadow-lg phone:h-52 phone:w-52" />
 				{:else}
-					<div class="relative h-40 w-40 rounded-xl bg-muted"></div>
+					<div class="relative h-40 w-40 rounded-xl bg-muted phone:h-52 phone:w-52"></div>
 				{/if}
-				<div class="relative min-w-0 flex-1">
-					<div class="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+				<div class="relative min-w-0 flex-1 phone:w-full phone:flex-none">
+					<div class="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground phone:flex-wrap phone:justify-center">
 						{t('common.playlist_singular')}
 						{#if isLocalList}
 							<span
@@ -1063,13 +1068,13 @@
 							</button>
 						{/if}
 					</div>
-					<h1 class="mt-1 font-heading text-4xl font-bold tracking-tight drop-shadow-lg">
+					<h1 class="mt-1 font-heading text-4xl font-bold tracking-tight drop-shadow-lg phone:text-[1.75rem] phone:leading-tight">
 						{pl.title ?? t('common.playlist_singular')}
 					</h1>
 					{#if subtitle}<p class="mt-2 text-sm text-muted-foreground">{subtitle}</p>{/if}
 					{#if pl.description}
 						<!-- Two lines, then More/Less, same as the album page. -->
-						<div class="mt-2 max-w-2xl">
+						<div class="mt-2 max-w-2xl phone:mx-auto">
 							<p class="whitespace-pre-line text-sm text-foreground/80 {expanded ? '' : 'line-clamp-2'}">
 								{pl.description}
 							</p>
@@ -1083,19 +1088,33 @@
 							{/if}
 						</div>
 					{/if}
-					<div class="mt-4 flex items-center justify-between gap-2">
+					<div class="mt-4 flex items-center justify-between gap-2 phone:flex-col phone:gap-2">
 						<div class="flex items-center gap-2">
 							<Button
-								class="gap-2"
+								class="gap-2 phone:h-11 phone:rounded-full phone:px-7"
 								onclick={() => playAll(null)}
 								disabled={!pl.items.length || preparing || resorting}
 							>
 								<HugeiconsIcon icon={PlayIcon} class="h-4 w-4" />
 								{preparing || resorting ? t('common.sorting') : t('player.play')}
 							</Button>
+							<!-- Play and Shuffle side by side, as phone music apps put them; desktop keeps
+							     shuffle in the ⋮ menu. -->
+							{#if isPhone}
+								<Button
+									variant="secondary"
+									class="h-11 gap-2 rounded-full px-6"
+									onclick={shufflePlay}
+									disabled={!pl.items.length}
+								>
+									<HugeiconsIcon icon={ShuffleIcon} class="h-4 w-4" />
+									{t('common.shuffle')}
+								</Button>
+							{/if}
 							<Button
 								variant="ghost"
 								size="icon"
+								class="phone:h-11 phone:w-11"
 								aria-label={t('a11y.playlist_options')}
 								onclick={openMenu}
 							>
@@ -1103,7 +1122,7 @@
 							</Button>
 							<TrackSelectButton
 								{selection}
-								class="-ml-2 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full transition hover:bg-muted hover:text-foreground"
+								class="-ml-2 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full transition hover:bg-muted hover:text-foreground phone:ml-0 phone:h-11 phone:w-11"
 							/>
 						</div>
 						<!-- Pushed to the far end of the header, away from the play controls. -->
@@ -1131,7 +1150,8 @@
 						</div>
 					</div>
 				</div>
-				<div class="absolute right-6 top-6">
+				<!-- A phone has no room beside the title: the filter gets its own full-width row. -->
+				<div class={isPhone ? 'relative w-full' : 'absolute right-6 top-6'}>
 					<TrackFilter
 						bind:value={query}
 						placeholder={t('common.search_this_playlist')}
@@ -1302,6 +1322,15 @@
 		>
 			<HugeiconsIcon icon={ArrowDownWideNarrowIcon} class="h-4 w-4" /> {t('player.add_to_queue')}
 		</button>
+		{#if isPhone && !isLocalList}
+			<button
+				class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent/10"
+				onclick={() => run(() => pl && download(pl.items))}
+				disabled={!pl?.items.length}
+			>
+				<HugeiconsIcon icon={Download04Icon} class="h-4 w-4" /> {t('downloads.download_all')}
+			</button>
+		{/if}
 		<!-- On Repeat is built from local play counts, and a playlist on this machine is no YouTube
 		     playlist either: neither has a radio to seed. -->
 		{#if !isOnRepeat && !isLocalList}

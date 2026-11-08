@@ -31,3 +31,8 @@ rustypipe_reports/
 /plans
 scripts/bench.sh
 scripts/triage.py
+
+# Android: the local signing key and its passwords
+/android-keystore/
+/src-tauri/gen/android/keystore.properties
+/src-tauri/gen/android/local.properties

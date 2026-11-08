@@ -45,7 +45,13 @@ use std::collections::VecDeque;
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender, TryRecvError};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
+use discord_rich_presence::activity;
+#[cfg(not(mobile))]
+use discord_rich_presence::{DiscordIpc, DiscordIpcClient};
+// Android: no Discord client on the device, so the same calls go to Discord's Gateway as the
+// signed-in user instead (mobile/discord_net.rs, Metrolist's approach).
+#[cfg(mobile)]
+use crate::discord_net::DiscordIpcClient;
 use innertube::SongItem;
 
 /// Discord application id (a snowflake — digits only). **Must be set before rich presence does

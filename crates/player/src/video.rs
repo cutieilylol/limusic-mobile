@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 use libmpv2::render::{OpenGLInitParams, RenderContext, RenderParam, RenderParamApiType};
 
-use crate::{quoted, Decks, Error, Player};
+use super::{quoted, Decks, Error, Player};
 
 /// The playing track and the gapless-next one are all that matter; the rest covers a skip landing
 /// while a resolve is in flight.
@@ -324,7 +324,7 @@ fn add_video(decks: &Arc<Decks>, deck: usize, audio: String, url: String) {
     let _ = std::thread::Builder::new().name("mpv-video-add".into()).spawn(move || {
         if let Err(e) = mpv.command("video-add", &[&quoted(&url), "auto"]) {
             tracing::warn!(deck, error = %e, "video: mpv could not open the picture");
-            let _ = decks.tx.send(crate::PlayerEvent::VideoFailed(audio));
+            let _ = decks.tx.send(super::PlayerEvent::VideoFailed(audio));
             return;
         }
         let _serial = decks.videos.lock().unwrap();

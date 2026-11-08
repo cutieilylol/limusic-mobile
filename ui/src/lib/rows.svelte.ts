@@ -25,6 +25,10 @@ export function rowScroller() {
 	let scrollTop = $state(0);
 	let viewportPx = $state(0);
 	let rowPx = $state(ROW_PX);
+	// The largest row actually measured; `ROW_PX` only stands in until the first one. Kept apart
+	// from `rowPx` so a list whose rows are shorter than the guess (a phone's, at 49px) can still
+	// get below it.
+	let seenPx = 0;
 	let offsetPx = $state(0);
 
 	return {
@@ -64,7 +68,7 @@ export function rowScroller() {
 				// while the same row occupies 72px once it is drawn. Taking the max settles on the
 				// drawn height in one step and cannot then oscillate between the two.
 				const h = node.querySelector('[data-row]')?.getBoundingClientRect().height ?? 0;
-				if (h > rowPx) rowPx = h;
+				if (h > seenPx) rowPx = seenPx = h;
 				// Where row 0 sits, for a container that scrolls a header away above the rows. Latest,
 				// not largest: the header genuinely changes height (expanding a description), and a
 				// stale offset would put the window in the wrong place.

@@ -1185,6 +1185,11 @@ impl AppState {
         v
     }
 
+    /// A stream for the downloader (downloads.rs): the same resolve a play does.
+    pub(crate) async fn resolve_stream(&self, video_id: &str) -> Result<PlaybackData, String> {
+        self.resolve(video_id, false, 0).await.map_err(|e| e.to_string())
+    }
+
     /// `is_upload` comes off the queue row, never off `/player`: the response that has to be
     /// handled here (LOGIN_REQUIRED) carries no `videoDetails` to read it from. Issue #71.
     async fn resolve(
@@ -1202,6 +1207,24 @@ impl AppState {
                 let removed = crate::local::forget_missing(&self.db, path);
                 let _ = self.app.emit("local-changed", serde_json::json!({ "removed": removed }));
                 ResolveError::LocalMissing(path.to_owned())
+            });
+        }
+        // A downloaded song plays from its file (downloads.rs): offline, no resolve, no cache.
+        if let Some(d) = crate::downloads::local(&self.db, video_id) {
+            return Ok(PlaybackData {
+                video_id: video_id.to_owned(),
+                stream_url: d.file,
+                itag: 0,
+                headers: Default::default(),
+                expires_in_seconds: i64::MAX / 2,
+                loudness_db: d.loudness_db,
+                playback_ping: None,
+                title: None,
+                artists: None,
+                duration: None,
+                thumbnail: None,
+                is_video: Some(false),
+                stream_client: "download".to_owned(),
             });
         }
         // Latency cache first (context/11) — honor expiry, never a source of truth.
@@ -3637,6 +3660,7 @@ impl AppState {
     }
 
     /// Advance repeat mode Off -> All -> One -> Off (the global hotkey; the UI cycles itself).
+    #[cfg_attr(mobile, allow(dead_code))]
     pub async fn cycle_repeat(self: &std::sync::Arc<Self>) {
         self.update_repeat(|mode| match mode {
             RepeatMode::Off => RepeatMode::All,

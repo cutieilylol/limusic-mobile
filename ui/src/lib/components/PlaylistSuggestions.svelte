@@ -19,6 +19,7 @@
 	import { openAddToPlaylist, playback, toast } from '$lib/player.svelte';
 	import { t } from '$lib/i18n.svelte';
 	import { thumb } from '$lib/thumb';
+	import { isPhone } from '$lib/mobile.svelte';
 
 	// Suggestions under a playlist you own (#395): YouTube Music's own shelf, or the playlist's
 	// radio where YouTube has none (past 100 tracks). Inline at the foot of the list rather than in
@@ -27,7 +28,9 @@
 	//
 	// On a long playlist the foot of the list is a long way down (#457), so the shelf also folds into
 	// a dock at the page's corner: a pill that opens into a tray holding the same rows. It steps
-	// aside whenever the shelf itself is on screen, so there is only ever one of them.
+	// aside whenever the shelf itself is on screen, so there is only ever one of them. Not on a
+	// phone: there the corner is the ⋮ column, and a pill parked over it hides a row's menu at
+	// every scroll position, so the shelf at the foot of the list is the only way in.
 	let {
 		playlistId,
 		token,
@@ -278,7 +281,7 @@
      and z-10 keeps it under the queue and lyrics overlays. Not absolute against the page: rendered
      inside the scroller, WebKitGTK drew an absolute one off the corner (half under the player bar)
      until the window was resized. Plain fade and one scale on a single element: nothing repeats. -->
-{#if live && !shelfInView && open}
+{#if live && !shelfInView && !isPhone && open}
 	<div
 		class="fixed right-6 z-10 flex max-h-[min(36rem,calc(100vh-12rem))] w-[min(30rem,calc(100vw-3rem))] origin-bottom-right {playback.now ? 'bottom-24' : 'bottom-6'} flex-col rounded-2xl border bg-card p-2 pt-3 shadow-xl outline-none"
 		role="dialog"
@@ -296,7 +299,7 @@
 			{@render body(true)}
 		</div>
 	</div>
-{:else if live && !shelfInView}
+{:else if live && !shelfInView && !isPhone}
 	<!-- The shelf's own badge until the batch is in, then the next picks' covers: it reads as the
 	     same shelf, pocketed. -->
 	<button

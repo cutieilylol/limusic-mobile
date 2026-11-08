@@ -29,12 +29,13 @@
 	let {
 		value = $bindable(''),
 		placeholder = t('common.search_this_list'),
-		onfocus
-	}: { value?: string; placeholder?: string; onfocus?: () => void } = $props();
+		onfocus,
+		class: className = ''
+	}: { value?: string; placeholder?: string; onfocus?: () => void; class?: string } = $props();
 </script>
 
 <div
-	class="flex items-center gap-2 rounded-full border bg-background/80 py-1.5 pl-3 pr-2 shadow-sm backdrop-blur focus-within:border-accent"
+	class="flex items-center gap-2 rounded-full border bg-background/80 py-1.5 pl-3 pr-2 shadow-sm backdrop-blur focus-within:border-accent {className}"
 >
 	<HugeiconsIcon
 		icon={SearchList01Icon}
@@ -46,7 +47,7 @@
 		{placeholder}
 		aria-label={placeholder}
 		{onfocus}
-		class="w-48 min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+		class="w-48 min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground phone:w-full phone:flex-1 phone:py-1"
 		onkeydown={(e) => e.key === 'Escape' && (value = '')}
 	/>
 	<!-- Holds its 1rem either way, so typing doesn't resize the box. -->

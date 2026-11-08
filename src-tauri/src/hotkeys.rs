@@ -3,6 +3,7 @@
 //! Uses `tauri-plugin-global-shortcut` to listen for keyboard events at the OS level
 //! (e.g. Windows `RegisterHotKey`), allowing users to control playback even when
 //! Limusic is minimized to the system tray or running in the background.
+#![cfg_attr(mobile, allow(dead_code))]
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -10,7 +11,13 @@ use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
+#[cfg(desktop)]
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+/// No global shortcuts on Android: the phone's own media buttons (headset, Bluetooth, the lock
+/// screen) reach the app through the media session instead. The config still round-trips, so a
+/// settings file synced from desktop keeps its bindings.
+#[cfg(mobile)]
+type Shortcut = String;
 
 use crate::db::Db;
 use crate::state::AppState;
@@ -73,6 +80,7 @@ pub struct HotkeyRegisterResult {
 /// Parse a stored binding ("Ctrl+Alt+Space") with the plugin's own parser. A bare key is refused:
 /// a global grab on Space or a letter would take that key from every app on the desktop. F-keys
 /// are the exception, nothing types with them.
+#[cfg(desktop)]
 pub fn parse_shortcut(input: &str) -> Result<Shortcut, String> {
     let shortcut: Shortcut = input.trim().parse().map_err(|e| format!("{e}"))?;
     let modified = shortcut.mods.intersects(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER);
@@ -97,7 +105,14 @@ impl HotkeysManager {
         Self { config: Mutex::new(config), registered: Mutex::new(HashMap::new()) }
     }
 
+    #[cfg(mobile)]
+    pub fn apply_config(&self, _app: &AppHandle, new_config: HotkeysConfig) -> HotkeyRegisterResult {
+        *self.config.lock().unwrap() = new_config.clone();
+        HotkeyRegisterResult { success: true, config: new_config, errors: HashMap::new() }
+    }
+
     /// Register all shortcuts from `new_config`, unregistering previous ones.
+    #[cfg(desktop)]
     pub fn apply_config(&self, app: &AppHandle, new_config: HotkeysConfig) -> HotkeyRegisterResult {
         let mut errors = HashMap::new();
         let mut new_registered = HashMap::new();
@@ -157,6 +172,7 @@ impl HotkeysManager {
     }
 
     /// Dispatch triggered shortcut to its bound action.
+    #[cfg(desktop)]
     pub fn handle_event(&self, app: &AppHandle, shortcut: &Shortcut, state: ShortcutState) {
         if state != ShortcutState::Pressed {
             return;
@@ -266,6 +282,7 @@ mod tests {
         assert_eq!(back.bindings, cfg.bindings);
     }
 
+    #[cfg(desktop)]
     #[test]
     fn test_parse_shortcut_valid() {
         assert!(parse_shortcut("Ctrl+Alt+Space").is_ok());
@@ -281,6 +298,7 @@ mod tests {
         }
     }
 
+    #[cfg(desktop)]
     #[test]
     fn test_parse_shortcut_invalid() {
         assert!(parse_shortcut("").is_err());

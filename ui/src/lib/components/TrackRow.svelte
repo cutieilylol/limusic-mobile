@@ -24,6 +24,7 @@
 	import ArtistLine from './ArtistLine.svelte';
 	import ExplicitIcon from './ExplicitIcon.svelte';
 	import { currentLocale, t } from '$lib/i18n.svelte';
+	import { isPhone } from '$lib/mobile.svelte';
 	import { keyOf } from '$lib/shortcuts';
 	import type { TrackSelection } from '$lib/selection.svelte';
 	import { Checkbox } from './ui/checkbox';
@@ -35,7 +36,7 @@
 		hideThumb = false,
 		compact = false,
 		showPlayCount = false,
-		columns,
+		columns: columnsProp,
 		hideRating = false,
 		onplay,
 		onAdd,
@@ -105,6 +106,9 @@
 		 *  the row itself is a play button. */
 		trailing?: Snippet;
 	} = $props();
+	// A phone row is cover, title and artist, then ⋮ (what YouTube Music and Spotify show): no
+	// column layout, and the marks, thumbs and length live in the ⋮ menu and the player instead.
+	const columns = $derived(isPhone ? undefined : columnsProp);
 	const selectionDescriptionId = $props.id();
 
 	// In a session as guest, clicking a song adds it to the shared queue instead of playing it —
@@ -331,10 +335,14 @@
 				{/if}
 			</div>
 			<div class="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-				{#if columns && song.explicit}
+				{#if (columns || isPhone) && song.explicit}
 					<ExplicitIcon class="mr-0.5 h-3.5 w-3.5 shrink-0" />
 				{/if}
 				<ArtistLine runs={song.artist_runs} text={song.artists} />
+				{#if isPhone && song.play_count && showPlayCount && !compact}
+					<!-- The plays column has no room on a phone; under the title, like YouTube Music. -->
+					<span class="shrink-0">· {t('library.play_count', { count: song.play_count })}</span>
+				{/if}
 				{#if compact && duration}
 					<!-- No leading dot with nothing before it: a search row can come back artist-less
 					     (YouTube drops the name when the query is the artist), leaving the length alone
@@ -349,7 +357,7 @@
 	     centred column of its own there; narrow ones sit it next to the duration at its natural width
 	     rather than dropping it, since it never needs more than "1,234 plays" worth of room. -->
 	{#if song.play_count && showPlayCount && !compact && !columns}
-		<div class="flex shrink-0 items-center justify-center text-xs text-muted-foreground lg:flex-1">
+		<div class="flex shrink-0 items-center justify-center text-xs text-muted-foreground lg:flex-1 phone:hidden">
 			<span class="truncate">{t('library.play_count', { count: song.play_count })}</span>
 		</div>
 	{/if}
@@ -419,7 +427,7 @@
 		     carries one, so it can't leave a hole on its neighbours. A Taste Match row that several
 		     members share overlaps their avatars, growing leftward so the marks stay in column.
 		     Under a column header it is a column of its own (Added by) instead. -->
-		{#if song.added_by_avatars?.length && !compact && !columns}
+		{#if song.added_by_avatars?.length && !compact && !columns && !isPhone}
 			{@render avatars()}
 		{/if}
 		<!-- Both marks are always on, unlike the thumbs beside them: they are properties of the song,
@@ -430,7 +438,7 @@
 		     first crawl, reserving it would be a hole on every row that can never fill. -->
 		{#snippet saved()}
 			{#if showRating && anySaved()}
-				<span class="flex h-7 w-7 shrink-0 items-center justify-center">
+				<span class="flex h-7 w-7 shrink-0 items-center justify-center phone:hidden">
 					{#if inPlaylists.length}
 						<SavedInPlaylists playlists={inPlaylists} />
 					{/if}
@@ -438,7 +446,7 @@
 			{/if}
 		{/snippet}
 		{#if !columns}{@render saved()}{/if}
-		{#if !hideRating && !columns}
+		{#if !hideRating && !columns && !isPhone}
 			<span class="flex h-3.5 w-3.5 shrink-0 items-center">
 				{#if song.explicit}
 					<ExplicitIcon class="h-3.5 w-3.5 text-muted-foreground" />
@@ -452,7 +460,7 @@
 			     `focus-within`: a hidden element can't take focus, so the row (which is focusable) is
 			     what has to reveal it before Tab can reach it. -->
 			<div
-				class="flex items-center gap-0.5 {rated === 'indifferent'
+				class="flex items-center gap-0.5 phone:hidden {rated === 'indifferent'
 					? 'invisible group-focus-within:visible group-hover:visible'
 					: ''}"
 			>
@@ -467,7 +475,7 @@
 			<!-- A fixed slot, or every mark to its left moves with the digits (#463). `tabular-nums`
 			     alone isn't enough: DM Sans has no tabular figures, and 10:00 is wider in any font.
 			     5ch holds up to 59:59; an hour-long track still widens its own row. -->
-			<span class="min-w-[5ch] shrink-0 text-right text-xs tabular-nums text-muted-foreground">{duration}</span>
+			<span class="min-w-[5ch] shrink-0 text-right text-xs tabular-nums text-muted-foreground phone:hidden">{duration}</span>
 		{/if}
 		{#if compact}
 			<!-- Persistent, not hover-only: a filled heart is state the row has to keep showing. -->
@@ -494,7 +502,7 @@
 			{playlistId}
 			{queueIndex}
 			{inLibraryList}
-			triggerClass="cursor-pointer rounded-md p-1.5 text-muted-foreground hover:bg-accent/20 hover:text-foreground {compact
+			triggerClass="row-menu cursor-pointer rounded-md p-1.5 text-muted-foreground hover:bg-accent/20 hover:text-foreground {compact
 				? ''
 				: 'invisible group-focus-within:visible group-hover:visible'}"
 		/>

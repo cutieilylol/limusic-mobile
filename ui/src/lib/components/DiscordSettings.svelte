@@ -17,6 +17,11 @@
 	import * as api from '$lib/api';
 	import { playback, prefs, toast } from '$lib/player.svelte';
 	import { t } from '$lib/i18n.svelte';
+	import { onMount } from 'svelte';
+	import { invoke } from '@tauri-apps/api/core';
+	import { listen } from '@tauri-apps/api/event';
+	import { isPhone } from '$lib/mobile.svelte';
+	import { copyText } from '$lib/clipboard';
 	import {
 		DISCORD_DEFAULTS,
 		parseDiscordConfig,
@@ -53,6 +58,46 @@
 	function set(patch: Partial<DiscordConfig>) {
 		Object.assign(cfg, patch);
 		save();
+	}
+
+	// Android: presence goes out as the signed-in user over Discord's Gateway (discord_net.rs),
+	// so there is an account to sign in to and an app of the user's own to sign in through.
+	type DiscordAccount = {
+		appId: string;
+		signedIn: boolean;
+		user: string | null;
+		avatar: string | null;
+		redirectUri: string;
+	};
+	let account = $state<DiscordAccount | null>(null);
+	let appIdInput = $state('');
+	onMount(() => {
+		if (!isPhone) return;
+		invoke<DiscordAccount>('discord_account').then((a) => {
+			account = a;
+			appIdInput = a.appId;
+		});
+		const un = listen<DiscordAccount>('discord-account', (e) => (account = e.payload));
+		const unErr = listen<string>('discord-error', (e) => toast.error(e.payload));
+		return () => {
+			un.then((f) => f());
+			unErr.then((f) => f());
+		};
+	});
+	async function saveAppId() {
+		try {
+			await invoke('discord_set_app_id', { appId: appIdInput.trim() });
+			toast.success(t('discord_android.saved'));
+		} catch (e) {
+			toast.error(String(e));
+		}
+	}
+	async function discordSignIn() {
+		try {
+			await invoke('discord_login');
+		} catch (e) {
+			toast.error(String(e));
+		}
 	}
 
 	async function setEnabled(on: boolean) {
@@ -174,8 +219,61 @@
 <!-- Options scroll, the preview does not. Side by side from `lg` up (where the modal is wide
      enough for both), stacked below it — under `lg` the dialog is viewport-width and a column of
      controls 200px wide is worse than scrolling past the card. -->
-<div class="flex min-h-0 flex-1 max-lg:flex-col">
-	<div class="min-w-0 flex-1 overflow-y-auto px-6 py-5">
+<div class="flex min-h-0 flex-1 max-lg:flex-col {isPhone ? 'overflow-y-auto' : ''}">
+	<div class="min-w-0 flex-1 {isPhone ? 'px-4' : 'overflow-y-auto px-6'} py-5">
+		{#if isPhone && account}
+			<section class={GROUP}>
+				<h3 class={LABEL}>{t('discord_android.account')}</h3>
+				<div class={CARD}>
+					<div class="flex flex-col gap-2 px-4 py-3.5">
+						<span class="text-sm font-medium">{t('discord_android.app_id')}</span>
+						<div class="flex gap-2">
+							<Input
+								bind:value={appIdInput}
+								inputmode="numeric"
+								placeholder={t('discord_android.app_id_placeholder')}
+								class="flex-1"
+							/>
+							<Button variant="outline" onclick={saveAppId} disabled={appIdInput.trim() === account.appId}>
+								{t('discord_android.save')}
+							</Button>
+						</div>
+						<p class="text-xs leading-relaxed text-muted-foreground">{t('discord_android.app_id_hint')}</p>
+						<div class="flex items-center gap-2 rounded-lg bg-muted/60 px-3 py-2">
+							<div class="min-w-0 flex-1">
+								<p class="text-[11px] text-muted-foreground">{t('discord_android.redirect')}</p>
+								<p class="truncate font-mono text-xs">{account.redirectUri}</p>
+							</div>
+							<Button
+								variant="ghost"
+								size="sm"
+								onclick={() => copyText(account!.redirectUri).then(() => toast.success(t('discord_android.copied')))}
+							>
+								{t('discord_android.copy')}
+							</Button>
+						</div>
+					</div>
+					<div class="flex items-center gap-3 px-4 py-3.5">
+						{#if account.signedIn}
+							{#if account.avatar}
+								<img src={account.avatar} alt="" class="h-9 w-9 rounded-full" />
+							{/if}
+							<span class="min-w-0 flex-1 truncate text-sm font-medium">
+								{account.user ? t('discord_android.signed_in_as', { name: account.user }) : t('discord_android.signed_in')}
+							</span>
+							<Button variant="outline" onclick={() => invoke('discord_logout')}>{t('discord_android.sign_out')}</Button>
+						{:else}
+							<div class="min-w-0 flex-1">
+								<Button class="w-full" onclick={discordSignIn} disabled={!account.appId}>
+									{t('discord_android.sign_in')}
+								</Button>
+								<p class="mt-2 text-xs text-muted-foreground">{t('discord_android.sign_in_hint')}</p>
+							</div>
+						{/if}
+					</div>
+				</div>
+			</section>
+		{/if}
 		<section class={GROUP}>
 			<div class={CARD}>
 				{@render row_({

@@ -160,7 +160,7 @@
 		{@attach fitMenu(anchor)}
 	>
 		{#if auth.account?.signedIn}
-			<div class="mb-3">
+			<div class="mb-3 phone:px-3 phone:pt-1">
 				<div class="truncate text-sm font-medium">{auth.account.name ?? t('nav.account')}</div>
 				{#if auth.account.handle || auth.account.email}
 					<div class="truncate text-xs text-muted-foreground">

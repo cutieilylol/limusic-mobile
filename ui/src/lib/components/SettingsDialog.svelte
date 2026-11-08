@@ -47,6 +47,7 @@
 	import { getVersion } from '@tauri-apps/api/app';
 	import { t, setLocale, currentLocale, LOCALES } from '$lib/i18n.svelte';
 	import GlobalHotkeysSettings from '$lib/components/GlobalHotkeysSettings.svelte';
+	import { isAndroid, isPhone } from '$lib/mobile.svelte';
 	import LyricsSourcesSettings from '$lib/components/LyricsSourcesSettings.svelte';
 	import LanguagePicker from '$lib/components/LanguagePicker.svelte';
 
@@ -59,7 +60,8 @@
 		| 'scrobbling'
 		| 'data'
 		| 'about';
-	const TABS = $derived<{ id: TabId; label: string; hint: string; icon: typeof Settings02Icon }[]>([
+	type TabDef = { id: TabId; label: string; hint: string; icon: typeof Settings02Icon };
+	const TABS = $derived(([
 		{ id: 'general', label: t('settings.tabs.general'), hint: t('settings.tabs.general_hint'), icon: Settings02Icon },
 		{ id: 'themes', label: t('settings.tabs.themes'), hint: t('settings.tabs.themes_hint'), icon: PaintBoardIcon },
 		{ id: 'playback', label: t('settings.tabs.playback'), hint: t('settings.tabs.playback_hint'), icon: PlayCircleIcon },
@@ -68,7 +70,10 @@
 		{ id: 'scrobbling', label: t('settings.tabs.scrobbling'), hint: t('settings.tabs.scrobbling_hint'), icon: LastFmIcon },
 		{ id: 'data', label: t('settings.tabs.data'), hint: t('settings.tabs.data_hint'), icon: Database02Icon },
 		{ id: 'about', label: t('settings.tabs.about'), hint: t('settings.tabs.about_hint'), icon: InformationCircleIcon }
-	]);
+	] as TabDef[]).filter(
+		// The phone has no global hotkeys. (Discord stays: it signs in over the Gateway there.)
+		(tb) => !isPhone || tb.id !== 'hotkeys'
+	));
 
 	// Shared shapes for the settings rows. Kept as strings so the markup below stays readable and
 	// every group looks identical without a wrapper component per row.
@@ -216,6 +221,11 @@
 	const normalizeOn = $derived(settings.normalize_volume !== 'false');
 	// Off by default: experimental, and it runs a second decoder while tracks overlap.
 	const crossfadeOn = $derived(settings.crossfade === 'true');
+	const skipSilenceOn = $derived(settings.skip_silence === 'true');
+	async function setSkipSilence(on: boolean) {
+		settings.skip_silence = on ? 'true' : 'false';
+		await api.setSetting('skip_silence', settings.skip_silence);
+	}
 	// A room carries one track and one position, so an overlap cannot be synced: the backend
 	// suspends the fade for as long as we are in one (`AppState::apply_crossfade`). Say so here,
 	// or it reads as crossfade quietly breaking.
@@ -467,22 +477,28 @@
 	     transitioning the width relayouts the whole modal every frame, and WebKitGTK is the webview
 	     that would pay for it. -->
 	<Dialog.Content
-		class="gap-0 overflow-hidden p-0 {tab === 'discord' || tab === 'scrobbling' || tab === 'themes' ? 'sm:max-w-5xl' : tab === 'hotkeys' ? 'sm:max-w-4xl' : 'sm:max-w-3xl'}"
+		class="gap-0 overflow-hidden p-0 {isPhone
+			? 'settings-phone'
+			: tab === 'discord' || tab === 'scrobbling' || tab === 'themes' ? 'sm:max-w-5xl' : tab === 'hotkeys' ? 'sm:max-w-4xl' : 'sm:max-w-3xl'}"
 	>
 		<Dialog.Description class="sr-only">{t('settings.title')}</Dialog.Description>
 
-		<div class="flex min-w-0 h-[min(38rem,80vh)]">
-			<!-- Tab rail -->
-			<nav class="flex w-52 shrink-0 flex-col border-r bg-muted/40 p-3">
-				<Dialog.Title class="px-3 pt-1 pb-4 font-heading text-base font-semibold">
+		<div class="flex min-w-0 {isPhone ? 'h-full flex-col' : 'h-[min(38rem,80vh)]'}">
+			<!-- Tab rail. On a phone it is a row of chips above the pane instead of a column beside it. -->
+			<nav
+				class={isPhone
+					? 'flex shrink-0 flex-col border-b bg-muted/40 px-2 pb-2 pt-[calc(0.5rem+var(--safe-top,0px))]'
+					: 'flex w-52 shrink-0 flex-col border-r bg-muted/40 p-3'}
+			>
+				<Dialog.Title class="px-3 pt-1 {isPhone ? 'pb-2' : 'pb-4'} font-heading text-base font-semibold">
 					{t('settings.title')}
 				</Dialog.Title>
-				<div class="flex flex-col gap-0.5">
+				<div class={isPhone ? 'flex gap-1 overflow-x-auto' : 'flex flex-col gap-0.5'}>
 					{#each TABS as tb (tb.id)}
 						<button
 							onclick={() => (tab = tb.id)}
 							aria-current={tab === tb.id}
-							class="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors {tab ===
+							class="flex {isPhone ? 'w-auto shrink-0' : 'w-full'} cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors {tab ===
 							tb.id
 								? 'bg-background text-foreground shadow-sm ring-1 ring-border/70'
 								: 'text-muted-foreground hover:bg-foreground/5 hover:text-foreground'}"
@@ -497,14 +513,16 @@
 						</button>
 					{/each}
 				</div>
-				{#if version}
+				{#if version && !isPhone}
 					<span class="mt-auto px-3 pb-1 text-[11px] text-muted-foreground">v{version}</span>
 				{/if}
 			</nav>
 
 			<!-- Content pane. min-w-0: a flex child's min-width is auto, so without it one wide row
 			     (a long font name, a long path) widens the pane and pushes every tab off the modal. -->
-			<div class="flex min-w-0 flex-1 flex-col">
+			<!-- min-h-0 too: in the phone's column layout the pane would otherwise grow to its content
+			     and run under the navigation bar instead of scrolling above it. -->
+			<div class="flex min-h-0 min-w-0 flex-1 flex-col">
 				<!-- h-14 also keeps the dialog's close button clear of the first row. -->
 				<header class="flex h-14 shrink-0 flex-col justify-center border-b px-6 pr-14">
 					<h2 class="text-sm font-semibold">{currentTab.label}</h2>
@@ -529,7 +547,7 @@
 						     first: two stacked dialogs would trap focus in the wrong one. -->
 						<button
 							type="button"
-							class="mb-5 inline-flex items-center gap-2 rounded-full border bg-muted/50 px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+							class="mb-5 {isPhone ? 'hidden' : 'inline-flex'} items-center gap-2 rounded-full border bg-muted/50 px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 							onclick={() => {
 								ui.settingsOpen = false;
 								ui.shortcutsOpen = true;
@@ -562,6 +580,7 @@
 								})}
 							</div>
 						</section>
+						{#if !isPhone}
 						<section class={GROUP}>
 							<h3 class={LABEL}>{t('settings.sections.system')}</h3>
 							<div class={CARD}>
@@ -603,6 +622,7 @@
 								{/if}
 							</div>
 						</section>
+						{/if}
 					{:else if tab === 'playback'}
 						<section class={GROUP}>
 							<h3 class={LABEL}>{t('settings.sections.audio')}</h3>
@@ -637,6 +657,14 @@
 										title: t('settings.playback.crossfade_duration'),
 										desc: t('settings.playback.crossfade_duration_hint'),
 										control: crossfadeSlider,
+										tall: true
+									})}
+								{/if}
+								{#if isAndroid}
+									{@render row({
+										title: t('mobile.skip_silence'),
+										desc: t('mobile.skip_silence_hint'),
+										control: skipSilenceSwitch,
 										tall: true
 									})}
 								{/if}
@@ -768,6 +796,7 @@
 							</div>
 						</section>
 
+						{#if !isPhone}
 						<section class={GROUP}>
 							<h3 class={LABEL}>{t('settings.sections.updates')}</h3>
 							<div class={CARD}>
@@ -797,6 +826,7 @@
 								{/if}
 							</div>
 						</section>
+						{/if}
 
 						<section class={GROUP}>
 							<h3 class={LABEL}>{t('settings.sections.report')}</h3>
@@ -889,6 +919,7 @@
 {#snippet autoplaySwitch()}<Switch checked={prefs.autoplay} onCheckedChange={setAutoplay} />{/snippet}
 
 {#snippet crossfadeSwitch()}<Switch checked={crossfadeOn} onCheckedChange={setCrossfade} />{/snippet}
+{#snippet skipSilenceSwitch()}<Switch checked={skipSilenceOn} onCheckedChange={setSkipSilence} />{/snippet}
 
 {#snippet crossfadeSlider()}
 	<div class="flex w-44 shrink-0 items-center gap-3">

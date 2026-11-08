@@ -16,6 +16,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import MediaCard from './MediaCard.svelte';
+	import MediaRow from './MediaRow.svelte';
 	import MediaCardSkeleton from './MediaCardSkeleton.svelte';
 	import ErrorState from './ErrorState.svelte';
 	import TrackFilter from './TrackFilter.svelte';
@@ -23,6 +24,7 @@
 	import * as api from '$lib/api';
 	import { indexCards, indexSongs, match } from '$lib/localsearch';
 	import { t } from '$lib/i18n.svelte';
+	import { isPhone, requestMusicFolder } from '$lib/mobile.svelte';
 	import {
 		addLocalFolder,
 		local,
@@ -85,6 +87,13 @@
 	const SOURCE = 'Local music';
 
 	async function pickFolder() {
+		// A phone has no folder dialog that hands back a real path: ask for the audio permission
+		// and watch the phone's own Music folder (downloads from other apps land there too).
+		if (isPhone) {
+			const music = await requestMusicFolder();
+			if (music) await addLocalFolder(music);
+			return;
+		}
 		const picked = await open({ directory: true, multiple: false, title: t('local.pick_folder_dialog') });
 		if (typeof picked === 'string') await addLocalFolder(picked);
 	}
@@ -105,14 +114,14 @@
 <div class="flex flex-col gap-5">
 	<!-- Folders -->
 	<div class="rounded-xl border bg-card/40 p-4">
-		<div class="mb-3 flex items-center justify-between gap-3">
+		<div class="mb-3 flex items-center justify-between gap-3 phone:flex-col phone:items-stretch">
 			<div class="min-w-0">
 				<div class="flex items-center gap-2 font-medium">
 					<HugeiconsIcon icon={DriveIcon} class="h-4 w-4" /> {t('local.folders')}
 				</div>
 				<p class="mt-0.5 text-xs text-muted-foreground">{t('local.folders_hint')}</p>
 			</div>
-			<div class="flex shrink-0 gap-2">
+			<div class="flex shrink-0 gap-2 phone:justify-end">
 				<Button
 					variant="ghost"
 					size="sm"
@@ -136,7 +145,7 @@
 							{folder}
 						</span>
 						<button
-							class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+							class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive phone:h-10 phone:w-10"
 							aria-label={t('a11y.remove_folder')}
 							onclick={() => forget(folder)}
 						>
@@ -161,8 +170,8 @@
 	{:else if local.songs.length}
 		<Tabs.Root bind:value={view}>
 			<!-- The counts follow the filter, so the tabs say where the matches are. -->
-			<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-				<Tabs.List>
+			<div class="mb-4 flex flex-wrap items-center justify-between gap-3 phone:mb-2 phone:flex-col phone:items-stretch phone:gap-2">
+				<Tabs.List class="phone:self-start">
 					<Tabs.Trigger value="albums">{t('local.albums_count', { count: albums.length })}</Tabs.Trigger>
 					<Tabs.Trigger value="artists">{t('local.artists_count', { count: artists.length })}</Tabs.Trigger>
 					<Tabs.Trigger value="songs">{t('local.songs_count', { count: songs.length })}</Tabs.Trigger>
@@ -176,18 +185,20 @@
 			     views of the same collection would be built on every visit. -->
 			<Tabs.Content value="albums">
 				{#if view === 'albums'}
-					<div class="card-grid content-in">
+					<!-- A phone lists them, as the Library does. -->
+					<div class={isPhone ? 'content-in -mx-1 flex flex-col' : 'card-grid content-in'}>
 						{#each albums as album (album.id)}
-							<MediaCard item={album} />
+							{#if isPhone}<MediaRow item={album} />{:else}<MediaCard item={album} />{/if}
 						{/each}
 					</div>
 				{/if}
 			</Tabs.Content>
 			<Tabs.Content value="artists">
 				{#if view === 'artists'}
-					<div class="card-grid content-in">
+					<!-- A phone lists them, as the Library does. -->
+					<div class={isPhone ? 'content-in -mx-1 flex flex-col' : 'card-grid content-in'}>
 						{#each artists as artist (artist.id)}
-							<MediaCard item={artist} />
+							{#if isPhone}<MediaRow item={artist} />{:else}<MediaCard item={artist} />{/if}
 						{/each}
 					</div>
 				{/if}

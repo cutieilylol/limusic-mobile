@@ -49,6 +49,12 @@
 	import VideoSurface from '$lib/components/VideoSurface.svelte';
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
 	import KeyboardShortcuts from '$lib/components/KeyboardShortcuts.svelte';
+	import MobileTopBar from '$lib/components/MobileTopBar.svelte';
+	import MobileNav from '$lib/components/MobileNav.svelte';
+	import MobileMiniBar from '$lib/components/MobileMiniBar.svelte';
+	import MobileNowPlaying from '$lib/components/MobileNowPlaying.svelte';
+	import { isPhone, initSleepTimer } from '$lib/mobile.svelte';
+	import { initDownloads } from '$lib/downloads.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { auth, initApp, np, playback, prefs, ui } from '$lib/player.svelte';
 	import { isLocalId } from '$lib/api';
@@ -220,16 +226,21 @@
 		}
 		// First: it reveals the window (see initWin).
 		const teardownWin = initWin();
-		checkForUpdatesQuiet();
+		// The Android build is side-loaded: no updater to ask.
+		if (!isPhone) checkForUpdatesQuiet();
 		// Repeat while the app stays open: ✕ hides to tray by default, so this component can stay
 		// mounted for days and a mount-only check would never see a release published in between.
-		const updateTimer = setInterval(checkForUpdatesQuiet, QUIET_INTERVAL_MS);
+		const updateTimer = isPhone ? 0 : setInterval(checkForUpdatesQuiet, QUIET_INTERVAL_MS);
+		let teardownSleep = () => {};
+		if (isPhone) initSleepTimer().then((un) => (teardownSleep = un)).catch(() => {});
+		if (isPhone) initDownloads();
 		const teardownApp = initApp();
 		const teardownZoom = initZoom();
 		const teardownShortcuts = initShortcuts();
 		initImport();
 		return () => {
 			clearInterval(updateTimer);
+			teardownSleep();
 			teardownApp();
 			teardownWin();
 			teardownZoom();
@@ -257,6 +268,28 @@
 {#if isMini}
 	<MiniPlayer />
 {:else}
+	{#if isPhone}
+	<!-- The phone shell: a top bar, the page, the mini player and a bottom navigation bar, with the
+	     full-screen player over all of it. Same pages, cards and dialogs as the desktop window. -->
+	<div class="relative flex h-dvh flex-col overflow-hidden bg-background text-foreground">
+		<MobileTopBar />
+		<main class="min-h-0 flex-1 overflow-y-auto overscroll-contain" bind:this={scroller}>
+			{#key `${auth.epoch}:${ui.epoch}`}
+				{@render children()}
+			{/key}
+		</main>
+		{#if !prefs.nativeVideo}<VideoSurface />{/if}
+		<!-- `phone-chrome`: out of the way while the keyboard is up (layout.css), as phone apps do,
+		     so the page keeps what is left of the screen. -->
+		{#if playback.now}
+			<div class="phone-chrome shrink-0" in:fly={{ y: 64, duration: 250, easing: cubicOut }}>
+				<MobileMiniBar />
+			</div>
+		{/if}
+		<div class="phone-chrome shrink-0"><MobileNav /></div>
+	</div>
+	{#if np.open && playback.now}<MobileNowPlaying />{/if}
+	{:else}
 	<!-- The window itself is transparent; this root paints the background and, when not maximized,
 	     rounds the corners (the compositor can't round an undecorated window for us on Linux).
 	     Theater mode counts as maximized here: it is fullscreen, and rounding it clips the corners
@@ -345,6 +378,7 @@
 			</div>
 		{/if}
 	</div>
+	{/if}
 
 	<!-- Theater mode covers everything, titlebar included, and puts the window in fullscreen for as
 	     long as it is mounted. Nothing playing means nothing to show, and that guard is also what
@@ -399,7 +433,7 @@
 		{@const t = ui.toast}
 		<div
 			transition:fly={{ y: 16, duration: 220, easing: cubicOut }}
-			class="fixed bottom-40 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-2 rounded-lg border bg-card px-4 py-2 text-sm shadow-lg"
+			class="fixed bottom-40 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-2 rounded-lg border bg-card px-4 py-2 text-sm shadow-lg phone:bottom-[calc(9.25rem+var(--safe-bottom,0px))] phone:max-w-[calc(100vw-2rem)]"
 		>
 			<!-- Three branches instead of a ternary on `icon`: HugeiconsIcon freezes `icon` at mount, so a
 			     new toast replacing a visible one would keep the old glyph. -->

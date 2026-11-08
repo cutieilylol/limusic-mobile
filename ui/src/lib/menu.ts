@@ -95,6 +95,13 @@ export function anchorMenu(e: Event, { align = 'left' }: { align?: 'left' | 'rig
  */
 export function fitMenu(a: Anchor) {
 	return (el: HTMLElement) => {
+		// A phone has no pointer to open a menu at: every menu is a sheet along the bottom edge,
+		// thumb height, the way Android apps show an item's actions (`[data-sheet]` in layout.css).
+		if (document.documentElement.classList.contains('phone')) {
+			el.dataset.sheet = '';
+			el.style.cssText = 'left:0;right:0;bottom:0;top:auto';
+			return;
+		}
 		el.style.cssText = `${UNPLACED};left:0;top:0;right:auto;bottom:auto`;
 		// offset*, not a client rect: the popup opens under a `zoom-in-95` animation, and a client
 		// rect is the *transformed* box, so it would report 95% of the real size.
@@ -149,7 +156,10 @@ export function ctxHost(open: (e: MouseEvent) => void) {
 			if (wantsNative(e as MouseEvent)) return; // let the field keep its paste menu
 			const t = e.target;
 			const button = t instanceof Element ? t.closest('button') : null;
-			if (button && button !== trigger) return;
+			// A long press on a phone (the Android build marks <html> `touch`) is how the item's menu
+			// is reached at all, and a card is mostly one big button, so there it opens from anywhere.
+			const touch = document.documentElement.classList.contains('touch');
+			if (button && button !== trigger && !touch) return;
 			open(e as MouseEvent);
 		};
 		host.addEventListener('contextmenu', onContextMenu);

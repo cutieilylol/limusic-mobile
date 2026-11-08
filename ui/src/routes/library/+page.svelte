@@ -19,7 +19,9 @@
 		SpotifyIcon,
 		SquareStackIcon,
 		UserCheck01Icon,
-		UserSharingIcon
+		UserSharingIcon,
+		Download04Icon,
+		HistoryIcon
 	} from '@hugeicons/core-free-icons';
 	import { Button } from '$lib/components/ui/button';
 	import * as Tabs from '$lib/components/ui/tabs';
@@ -27,6 +29,7 @@
 	import LibrarySongs from '$lib/components/LibrarySongs.svelte';
 	import LocalMusic from '$lib/components/LocalMusic.svelte';
 	import MediaCard from '$lib/components/MediaCard.svelte';
+	import MediaRow from '$lib/components/MediaRow.svelte';
 	import MediaCardSkeleton from '$lib/components/MediaCardSkeleton.svelte';
 	import ErrorState from '$lib/components/ErrorState.svelte';
 	import type { BrowseItem } from '$lib/api';
@@ -44,6 +47,8 @@
 	import { mergeSaved, unsynced } from '$lib/personal';
 	import { reveal } from '$lib/reveal.svelte';
 	import { t } from '$lib/i18n.svelte';
+	import { isPhone } from '$lib/mobile.svelte';
+	import { downloads, initDownloads } from '$lib/downloads.svelte';
 	import { openImport } from '$lib/import.svelte';
 	import ExperimentalBadge from '$lib/components/ExperimentalBadge.svelte';
 
@@ -52,6 +57,19 @@
 	let tab = $state(page.url.searchParams.get('tab') ?? lastTab);
 	$effect(() => {
 		lastTab = tab;
+	});
+	// A phone's tab strip scrolls sideways: bring the chosen tab (Uploads, Local) into the middle
+	// instead of leaving it off the edge. Only the strip scrolls, never the page.
+	$effect(() => {
+		tab;
+		if (!isPhone) return;
+		requestAnimationFrame(() => {
+			const list = document.querySelector<HTMLElement>('main [data-slot=tabs-list]');
+			const on = list?.querySelector<HTMLElement>('[data-state=active]');
+			if (!list || !on) return;
+			const x = on.getBoundingClientRect().left - list.getBoundingClientRect().left + list.scrollLeft;
+			list.scrollTo({ left: x - (list.clientWidth - on.offsetWidth) / 2, behavior: 'smooth' });
+		});
 	});
 	// Uploads splits three ways (all / songs / albums): YouTube Music takes uploaded albums too, and
 	// they are a card grid rather than rows, so they can't just join the track list.
@@ -121,7 +139,15 @@
 </script>
 
 {#snippet grid(items: BrowseItem[], empty: string, rv: ReturnType<typeof reveal>, nudge = false)}
-	{#if items.length}
+	{#if items.length && isPhone}
+		<!-- A phone gets a list, not a grid of desktop-sized cards (MediaRow). -->
+		<div class="content-in -mx-1 flex flex-col">
+			{#each items.slice(0, rv.count(items.length)) as item (item.kind + item.id)}
+				<MediaRow {item} pinned={personal.pins.includes(item.id)} />
+			{/each}
+		</div>
+		{#if rv.more(items.length)}<div {@attach rv.sentinel}></div>{/if}
+	{:else if items.length}
 		<div class="card-grid content-in">
 			{#each items.slice(0, rv.count(items.length)) as item (item.kind + item.id)}
 				<MediaCard {item} />
@@ -151,8 +177,8 @@
 	{/if}
 {/snippet}
 
-<div class="p-6">
-	<div class="mb-6 flex items-center justify-between">
+<div class={isPhone ? 'px-4 pb-6 pt-2' : 'p-6'}>
+	<div class="mb-6 flex items-center justify-between gap-2">
 		<h1 class="font-heading text-2xl font-bold">{t('library.title')}</h1>
 		<div class="flex items-center gap-2">
 			<!-- Only with something to push: saves made before signing in, which live on this
@@ -205,20 +231,45 @@
 				title={t('import.button_tooltip')}
 				onclick={() => openImport()}
 			>
-				<HugeiconsIcon icon={SpotifyIcon} class="h-4 w-4" /> {t('import.button')}
-				<ExperimentalBadge />
+				<HugeiconsIcon icon={SpotifyIcon} class="h-4 w-4" /> <span class="phone:hidden">{t('import.button')}</span>
+				{#if !isPhone}<ExperimentalBadge />{/if}
 			</Button>
 			<!-- Signed out too: a playlist can live on this machine with no account (#251). -->
 			<Button variant="outline" size="sm" class="gap-2" onclick={() => openNewPlaylist()}>
-				<HugeiconsIcon icon={Add01Icon} class="h-4 w-4" /> {t('nav.new_playlist')}
+				<HugeiconsIcon icon={Add01Icon} class="h-4 w-4" /> <span class="phone:hidden">{t('nav.new_playlist')}</span>
 			</Button>
 		</div>
 	</div>
 
 
+	<!-- Phone: what's on the device and what you played, one tap from the library, like the
+	     Downloads and History rows at the top of YouTube Music's library. -->
+	{#if isPhone}
+		<div class="mb-5 grid grid-cols-2 gap-2" {@attach () => initDownloads()}>
+			<a href="/downloads" class="flex items-center gap-3 rounded-2xl border bg-card px-3 py-3 active:bg-muted">
+				<span class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
+					<HugeiconsIcon icon={Download04Icon} class="h-5 w-5" />
+				</span>
+				<span class="min-w-0">
+					<span class="block text-sm font-medium">{t('downloads.title')}</span>
+					<span class="block truncate text-xs text-muted-foreground">
+						{downloads.queued.length ? t('downloads.downloading') : downloads.done.length}
+					</span>
+				</span>
+			</a>
+			<a href="/history" class="flex items-center gap-3 rounded-2xl border bg-card px-3 py-3 active:bg-muted">
+				<span class="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-foreground">
+					<HugeiconsIcon icon={HistoryIcon} class="h-5 w-5" />
+				</span>
+				<span class="block text-sm font-medium">{t('nav.history')}</span>
+			</a>
+		</div>
+	{/if}
+
 	<!-- The tabs always render: Local music needs neither an account nor a connection. -->
 	<Tabs.Root bind:value={tab}>
-		<Tabs.List class="mb-4">
+		<!-- A phone scrolls the filter chips sideways, edge to edge, instead of clipping the last ones. -->
+		<Tabs.List class="mb-4 phone:mb-0 phone:-mx-4 phone:w-[calc(100%+2rem)] phone:justify-start phone:overflow-x-auto phone:rounded-none phone:bg-transparent phone:px-4">
 			<Tabs.Trigger value="all">
 				<HugeiconsIcon icon={SquareStackIcon} class="h-4 w-4" /> {t('common.all')}
 			</Tabs.Trigger>

@@ -33,3 +33,9 @@ listen-protocol = { path = "crates/listen-protocol" }
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
+
+# Android: rquickjs-sys (rustypipe's JS engine) ships no pre-generated bindings for the Android
+# targets. Android's aarch64/x86_64 ABI is the same LP64 one as linux-gnu, so the vendored copy
+# carries the linux-gnu bindings under the Android target names.
+[patch.crates-io]
+rquickjs-sys = { path = "vendor/rquickjs-sys" }

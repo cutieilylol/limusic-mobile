@@ -111,7 +111,7 @@
 	}
 </script>
 
-<div class="p-6">
+<div class="p-6 phone:px-4 phone:pt-3">
 	{#if loading}
 		<div class="mb-4 h-36 animate-pulse rounded-2xl border bg-card/40"></div>
 		{#each Array(8) as _, i (i)}
@@ -137,7 +137,7 @@
 					class="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/40"
 				></div>
 			</div>
-			<div class="relative flex flex-wrap items-center gap-4 p-4">
+			<div class="relative flex flex-wrap items-center gap-4 p-4 phone:flex-col phone:items-stretch phone:gap-3">
 				{#if covers.length}
 					<!-- An overlapping strip rather than a single cover: history has no artwork of its own,
 					     and the last few sleeves say what the page holds better than any icon. -->
@@ -147,7 +147,7 @@
 								src={thumb(cover, 400)}
 								alt=""
 								style="z-index:{5 - i}"
-								class="relative -ml-5 h-20 w-20 rounded-xl object-cover shadow-lg ring-2 ring-background first:ml-0"
+								class="relative -ml-5 h-20 w-20 rounded-xl object-cover shadow-lg ring-2 ring-background first:ml-0 phone:h-16 phone:w-16"
 							/>
 						{/each}
 					</div>

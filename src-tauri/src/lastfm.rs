@@ -915,6 +915,12 @@ pub(crate) fn open_browser(url: &str) -> Result<(), String> {
     };
     #[cfg(target_os = "macos")]
     let cmd = std::process::Command::new("open").arg(url).spawn().map(|_| ());
+    // Android: an ACTION_VIEW intent from the Kotlin side opens the user's browser.
+    #[cfg(mobile)]
+    let cmd: Result<(), std::io::Error> = {
+        player::bridge::send("app.openUrl", serde_json::json!({ "url": url }));
+        Ok(())
+    };
     // ShellExecute, not `cmd /C start`: cmd.exe re-parses its command line, so a `"` in the URL
     // ended the quoting and the rest ran as a command, and `%VAR%` expanded. ShellExecute hands the
     // URL to the browser as one string, `&` included (the Last.fm token after it used to get

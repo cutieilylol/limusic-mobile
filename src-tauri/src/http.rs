@@ -12,6 +12,7 @@
 //!
 //! `crates/innertube` keeps its own client on purpose. It is the other side of the transport
 //! boundary (context/11) and it configures a proxy per session, which is client-level state.
+#![cfg_attr(mobile, allow(dead_code))]
 
 use std::sync::OnceLock;
 

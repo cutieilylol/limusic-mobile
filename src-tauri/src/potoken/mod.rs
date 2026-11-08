@@ -13,6 +13,7 @@
 //! `/GenerateIT` hands that attestation an integrity token of the wrong class. See `botguard.rs`
 //! and `progress/KNOWN-ISSUES.md` KI-1.
 
+#[cfg_attr(mobile, path = "../mobile/botguard.rs")]
 mod botguard;
 
 use std::sync::atomic::{AtomicBool, Ordering};

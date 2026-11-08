@@ -1,0 +1,99 @@
+name: iOS
+
+# The iPhone build. Xcode only exists on a Mac and this project is developed on Windows, so every
+# compile happens here. Manual only: a macOS minute costs ten of the free allowance.
+#
+#   mode=init  generates src-tauri/gen/apple (artifact `gen-apple`, to be committed by hand) and
+#              reports what the Swift and Rust halves make of the iOS SDK.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: What to do
+        required: true
+        default: init
+        type: choice
+        options: [init]
+
+concurrency:
+  group: ios
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          key: ios
+          cache-on-failure: true
+
+      - name: Tauri CLI
+        run: npm install -g @tauri-apps/cli@2.12.4
+
+      # First and cheap: under a minute, against the many a Rust build takes.
+      - name: Type-check the Swift
+        id: swift
+        continue-on-error: true
+        run: |
+          xcrun --sdk iphoneos swiftc -typecheck \
+            -target arm64-apple-ios16.4 \
+            -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
+            src-tauri/ios-native/*.swift
+
+      - name: Generate the Xcode project
+        id: init
+        continue-on-error: true
+        env:
+          # Placeholder: the .ipa is built unsigned, and Sideloadly signs it at install time.
+          APPLE_DEVELOPMENT_TEAM: "0000000000"
+        run: cd src-tauri && tauri ios init --ci
+
+      - name: Upload the Xcode project
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gen-apple
+          path: src-tauri/gen/apple
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Build the UI
+        run: cd ui && pnpm install --frozen-lockfile && pnpm build
+
+      - name: Check the Rust for iOS
+        id: rust
+        continue-on-error: true
+        env:
+          APPLE_DEVELOPMENT_TEAM: "0000000000"
+        run: cargo check --target aarch64-apple-ios -p limusic-app --features tauri/custom-protocol --locked
+
+      - name: Results
+        run: |
+          echo "swift=${{ steps.swift.outcome }} init=${{ steps.init.outcome }} rust=${{ steps.rust.outcome }}"
+          test "${{ steps.swift.outcome }}" = success
+          test "${{ steps.init.outcome }}" = success
+          test "${{ steps.rust.outcome }}" = success

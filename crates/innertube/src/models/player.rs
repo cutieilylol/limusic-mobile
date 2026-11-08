@@ -220,6 +220,12 @@ impl Format {
     }
 }
 
+/// Whether this device's player can open an audio stream of this MIME type. AVFoundation has no
+/// WebM demuxer, so on iOS the Opus streams are out and YouTube's AAC ones are what plays.
+pub fn plays_here(mime: &str) -> bool {
+    !(cfg!(target_os = "ios") && mime.contains("webm"))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AudioQuality {
     High,
@@ -244,6 +250,10 @@ pub fn find_format(data: &StreamingData, quality: AudioQuality) -> Option<&Forma
     // before anything else: a dub is never the better stream, at any bitrate.
     let original: Vec<&Format> = audio.iter().copied().filter(|f| f.is_original()).collect();
     let audio = if original.is_empty() { audio } else { original };
+    // Before the quality ranking: it scores Opus highest, and iOS can't open a WebM at all.
+    let playable: Vec<&Format> =
+        audio.iter().copied().filter(|f| plays_here(&f.mime_type)).collect();
+    let audio = if playable.is_empty() { audio } else { playable };
     match quality {
         AudioQuality::High | AudioQuality::Auto => audio.into_iter().max_by(|a, b| {
             a.quality_rank()
@@ -269,13 +279,15 @@ pub fn find_format(data: &StreamingData, quality: AudioQuality) -> Option<&Forma
 ///
 /// Video-only: the audio still comes from mpv, which is playing the same videoId. VP9 rather than
 /// MP4 because a stock Fedora only ships openh264 (constrained baseline) and YouTube's 720p/1080p
-/// MP4 is High profile, so itag 137 would fail for those users. context/03.
+/// MP4 is High profile, so itag 137 would fail for those users. context/03. iOS is the other way
+/// round: H.264 is the one codec its webview is sure to play in a `<video>`.
 pub fn find_video_format(data: &StreamingData, max_height: i32) -> Option<&Format> {
+    let codec = if cfg!(target_os = "ios") { "avc1" } else { "vp9" };
     data.adaptive_formats
         .iter()
         .filter(|f| {
             !f.is_audio()
-                && f.mime_type.contains("vp9")
+                && f.mime_type.contains(codec)
                 && f.height.is_some_and(|h| h <= max_height)
         })
         // Biggest picture that fits, then the smoother of a 30/60fps pair, then the better encode.

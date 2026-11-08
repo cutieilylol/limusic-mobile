@@ -9,6 +9,7 @@
 		ArrowDown01Icon,
 		ArrowTurnBackwardIcon,
 		ArrowUp01Icon,
+		DragDropVerticalIcon,
 		InfinityIcon
 	} from '@hugeicons/core-free-icons';
 	import TrackRow from '$lib/components/TrackRow.svelte';
@@ -27,6 +28,7 @@
 	import { rowScroller } from '$lib/rows.svelte';
 	import { dragScroll, QUEUE_ROW_MIME } from '$lib/dnd';
 	import { playback, prefs, setAutoplay, openAddToPlaylist } from '$lib/player.svelte';
+	import { haptic, isPhone } from '$lib/mobile.svelte';
 	import { lt } from '$lib/lt.svelte';
 	import { currentLocale, t } from '$lib/i18n.svelte';
 
@@ -64,6 +66,71 @@
 		if (to !== null) api.moveInQueue(dragFrom!, to);
 		dragFrom = null;
 		dropAt = null;
+		dragDy = 0;
+	}
+
+	// A finger has no HTML5 drag and drop (Android's WebView never starts one from a touch), so a
+	// phone drags by the grip at the end of the row: pointer events, with the row following the
+	// finger, the same drop bar, the same move. The edges of the list scroll it while held there.
+	let dragDy = $state(0);
+	function gripDown(e: PointerEvent, i: number) {
+		if (!canDrag(i) || !el) return;
+		e.preventDefault();
+		e.stopPropagation();
+		const grip = e.currentTarget as HTMLElement;
+		grip.setPointerCapture(e.pointerId);
+		dragFrom = i;
+		dropAt = i;
+		dragDy = 0;
+		haptic();
+		const y0 = e.clientY;
+		const top0 = el.scrollTop;
+		let y = y0;
+		const aim = () => {
+			dragDy = y - y0 + el.scrollTop - top0;
+			for (const row of el.querySelectorAll<HTMLElement>('[data-row]')) {
+				const j = Number(row.dataset.i);
+				if (j === dragFrom) continue;
+				const r = row.getBoundingClientRect();
+				if (y >= r.top && y < r.bottom) {
+					dropAt = y < r.top + r.height / 2 ? j : j + 1;
+					return;
+				}
+			}
+		};
+		let frame = requestAnimationFrame(function edge() {
+			const box = el.getBoundingClientRect();
+			const pull = y < box.top + 56 ? y - (box.top + 56) : y > box.bottom - 56 ? y - (box.bottom - 56) : 0;
+			if (pull) {
+				el.scrollTop += pull / 4;
+				aim();
+			}
+			frame = requestAnimationFrame(edge);
+		});
+		const move = (ev: PointerEvent) => {
+			y = ev.clientY;
+			aim();
+		};
+		const finish = (drop: boolean) => () => {
+			cancelAnimationFrame(frame);
+			window.removeEventListener('pointermove', move);
+			window.removeEventListener('pointerup', up);
+			window.removeEventListener('pointercancel', cancel);
+			if (drop) onDrop();
+			else {
+				dragFrom = null;
+				dropAt = null;
+				dragDy = 0;
+			}
+		};
+		const up = finish(true);
+		const cancel = finish(false);
+		// On the window, not the grip: past a couple of hundred rows the list windows them, and
+		// pulling the edge far enough unmounts the dragged row, grip and listeners with it. The
+		// release has to land somewhere or the edge keeps scrolling and the drag never ends.
+		window.addEventListener('pointermove', move);
+		window.addEventListener('pointerup', up);
+		window.addEventListener('pointercancel', cancel);
 	}
 
 	// One list in play order, autoplay's continuation under its own divider (`queue.ts`).
@@ -264,7 +331,12 @@
 				data-row
 				data-i={i}
 				role="listitem"
-				class="{windowed ? 'relative!' : 'relative'} {dragFrom === i ? 'opacity-40' : ''}"
+				class="{windowed ? 'relative!' : 'relative'} {dragFrom === i
+					? isPhone
+						? 'z-20 rounded-lg bg-popover shadow-xl'
+						: 'opacity-40'
+					: ''}"
+				style={isPhone && dragFrom === i ? `transform: translateY(${dragDy}px)` : undefined}
 				animate:flip={{ duration: motion.flip, easing: cubicOut }}
 				in:arrive={motion.rows}
 				out:leave={motion.rows}
@@ -284,6 +356,25 @@
 						class="pointer-events-none absolute inset-x-2 bottom-0 z-10 h-0.5 rounded-full bg-primary"
 					></div>
 				{/if}
+				<!-- The grip, on a phone: the row's last slot, after the ⋮. Rows that can't move (the
+				     playing one, what came before it) keep the slot empty so the ⋮ stay in a column. -->
+				{#snippet grip()}
+					<span
+						class="flex h-10 w-9 shrink-0 touch-none items-center justify-center text-muted-foreground {canDrag(i)
+							? ''
+							: 'invisible'}"
+						aria-hidden="true"
+						onpointerdown={(e) => gripDown(e, i)}
+						onclick={(e) => e.stopPropagation()}
+						oncontextmenu={(e) => {
+							// A held grip is a drag, not the WebView's long press (the row's ⋮ menu).
+							e.preventDefault();
+							e.stopPropagation();
+						}}
+					>
+						<HugeiconsIcon icon={DragDropVerticalIcon} class="h-5 w-5" />
+					</span>
+				{/snippet}
 				<TrackRow
 					song={item}
 					index={i}
@@ -297,6 +388,7 @@
 					removeLabel={t('player.remove_from_queue')}
 					playlistId={playback.queue.sourceId}
 					queueIndex={i}
+					trailing={isPhone && canEdit ? grip : undefined}
 				/>
 			</div>
 		{/each}

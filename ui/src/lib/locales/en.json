@@ -370,7 +370,7 @@
 		"no_uploads": "Nothing uploaded yet. Songs you upload at music.youtube.com show up here.",
 		"no_upload_albums": "No uploaded albums yet. Albums you upload at music.youtube.com show up here.",
 		"uploads_signed_out": "Sign in to see the music you’ve uploaded to YouTube Music.",
-		"songs_signed_out": "Sign in to see the songs saved in your YouTube Music library. Music on this machine is in the Local tab.",
+		"songs_signed_out": "Sign in to see the songs saved in your YouTube Music library. Music on this device is in the Local tab.",
 		"no_library_songs": "No songs in your library yet. Hit the ⋯ on a song and save it, or like it, and it lands here.",
 		"empty_signed_out": "Nothing saved yet. Open a playlist or album and hit Save to library, or sign in for the one on your account.",
 		"empty": "Your library is empty.",
@@ -384,7 +384,7 @@
 		"songs_count": "{count} songs",
 		"songs_count_one": "1 song",
 		"on_this_device": "On this device",
-		"on_this_device_tooltip": "Saved on this computer, not on a YouTube Music account",
+		"on_this_device_tooltip": "Saved on this device, not on a YouTube Music account",
 		"local_playlist_subtitle": "On this device • {count} songs",
 		"local_playlist_subtitle_one": "On this device • 1 song",
 		"empty_playlist_hint": "Pick Save to playlist from any song’s ⋯ menu to add it here.",
@@ -532,7 +532,7 @@
 			"app_icon_dialog": "Choose an app icon",
 			"app_icon_filter": "PNG image",
 			"mode": "Light or dark",
-			"mode_hint": "System follows your computer's setting and switches with it.",
+			"mode_hint": "System follows your device's setting and switches with it.",
 			"mode_light": "Light",
 			"mode_dark": "Dark",
 			"mode_system": "System",
@@ -822,7 +822,7 @@
 			"artwork_note": "Artwork applies here at once and uploads to YouTube Music in the background. Square JPEG or PNG works best.",
 			"pick_artwork": "Choose playlist artwork",
 			"image_filter": "Images",
-			"local_artwork_note": "Artwork stays on this computer. Square JPEG or PNG works best."
+			"local_artwork_note": "Artwork stays on this device. Square JPEG or PNG works best."
 		},
 		"share": {
 			"title": "Share",
@@ -920,9 +920,9 @@
 			"account": "YouTube Music",
 			"account_desc": "On your account, wherever you sign in",
 			"device": "This device",
-			"device_desc": "No account needed, it stays on this computer",
-			"device_only": "It stays on this computer, no account needed. Sign in to make playlists on YouTube Music instead.",
-			"local_files": "Songs from your computer can only go in a playlist on this device."
+			"device_desc": "No account needed, it stays on this device",
+			"device_only": "It stays on this device, no account needed. Sign in to make playlists on YouTube Music instead.",
+			"local_files": "Songs stored on this device can only go in a playlist on this device."
 		}
 	},
 	"integrations": {
@@ -1194,7 +1194,7 @@
 		"title": "Import from Spotify",
 		"experimental": "Experimental",
 		"experimental_tooltip": "New and still being fine-tuned. If an import gets something wrong, please report it.",
-		"desc": "Bring your playlists over. It all runs on this computer: Spotify is only asked for the playlist, YouTube Music only for the songs.",
+		"desc": "Bring your playlists over. It all runs on this device: Spotify is only asked for the playlist, YouTube Music only for the songs.",
 		"link_title": "Paste a link",
 		"link_desc": "Any public playlist or album. In Spotify, open its ⋯ menu, then Share, then Copy link.",
 		"continue": "Continue",
@@ -1291,5 +1291,56 @@
 			"not_found": "Couldn’t find that on YouTube Music.",
 			"cooldown": "YouTube Music asked Limusic to slow down, so imports are paused until {time}. Everything found so far is saved."
 		}
+	},
+	"mobile": {
+		"now_playing": "Now playing",
+		"up_next": "Up next",
+		"sleep": "Sleep",
+		"sleep_timer": "Sleep timer",
+		"sleep_left": "Pausing in {time}",
+		"sleep_end_of_track": "End of this song",
+		"sleep_end_of_track_on": "Pausing when this song ends",
+		"sleep_off": "Cancel",
+		"sleep_turn_off": "Turn off timer",
+		"minutes": "{n} minutes",
+		"one_hour": "1 hour",
+		"equalizer": "Equalizer",
+		"no_equalizer": "This phone has no equalizer app",
+		"share": "Share",
+		"skip_silence": "Skip silence",
+		"skip_silence_hint": "Jump over silent stretches inside tracks, like long gaps before a hidden song."
+	},
+	"downloads": {
+		"title": "Downloads",
+		"download": "Download",
+		"downloading": "Downloading…",
+		"remove": "Remove download",
+		"remove_all": "Remove all",
+		"remove_all_confirm": "Delete all {count} downloaded songs from this phone?",
+		"started_one": "Downloading “{title}”",
+		"started_many": "Downloading {count} songs",
+		"failed": "Couldn't download “{title}”",
+		"empty": "Nothing downloaded yet",
+		"empty_hint": "Download songs, albums and playlists from their ⋮ menu to play them without a connection.",
+		"queued": "{count} waiting",
+		"summary": "{count} songs · {size}",
+		"summary_one": "1 song · {size}",
+		"download_all": "Download all"
+	},
+	"discord_android": {
+		"account": "Discord account",
+		"app_id": "Application ID",
+		"app_id_hint": "From your own app at discord.com/developers. Discord needs an app of yours to let Limusic sign in; the steps are in docs/ANDROID.md.",
+		"app_id_placeholder": "e.g. 1234567890123456789",
+		"save": "Save",
+		"redirect": "Redirect link to add in your app",
+		"copy": "Copy",
+		"sign_in": "Sign in with Discord",
+		"sign_in_hint": "Opens Discord's own sign-in page. Limusic never sees your password.",
+		"signed_in_as": "Signed in as {name}",
+		"signed_in": "Signed in",
+		"sign_out": "Sign out",
+		"saved": "Application ID saved",
+		"copied": "Copied"
 	}
 }

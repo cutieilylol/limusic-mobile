@@ -241,7 +241,7 @@ pub async fn get_queue(state: St<'_>) -> Result<serde_json::Value, String> {
 /// `visitor_data`) and internal blobs (`queue_json`, `queue_index`, `queue_position`) never cross
 /// into the webview: they'd otherwise ship the login credential to the renderer on every open, and
 /// the webview can't overwrite them either.
-const UI_SETTINGS: [&str; 31] = [
+const UI_SETTINGS: [&str; 32] = [
     "volume",
     "proxy",
     "quality",
@@ -273,6 +273,7 @@ const UI_SETTINGS: [&str; 31] = [
     "crossfade",
     "crossfade_secs",
     "locale",
+    "skip_silence",
 ];
 
 /// Resolve the music video for `video_id` and hand back a `limusicvideo://` URL the player view
@@ -404,6 +405,7 @@ pub async fn get_settings(state: St<'_>) -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
+#[cfg_attr(mobile, allow(unused_variables))]
 pub async fn set_setting(
     app: tauri::AppHandle,
     state: St<'_>,
@@ -417,6 +419,7 @@ pub async fn set_setting(
     // startup repoints an existing entry at the running binary (lib.rs). Before the write, so a
     // failure leaves the setting as it was. A dev build would register itself, and at login its
     // window needs a vite server that isn't running.
+    #[cfg(desktop)]
     if key == "autostart" {
         if tauri::is_dev() {
             return Err(
@@ -435,6 +438,10 @@ pub async fn set_setting(
         res.map_err(|e| format!("autostart: {e}"))?;
     }
     state.db.set_setting(&key, &value);
+    #[cfg(mobile)]
+    if key == "skip_silence" {
+        state.player.set_skip_silence(value == "true");
+    }
     // A music video track already playing gets its picture now rather than from the next track.
     if key == "music_videos" && value == "true" {
         state.inner().attach_current_video().await;
@@ -495,7 +502,7 @@ pub async fn set_setting(
     }
     // Hand the frame back to the compositor (or take it again). macOS is not on this path: its
     // titlebar style is fixed at window creation, so the setting is hidden there.
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(all(desktop, not(target_os = "macos")))]
     if key == "system_titlebar" {
         use tauri::Manager;
         if let Some(w) = app.get_webview_window("main") {
@@ -788,8 +795,11 @@ pub async fn show_main(state: St<'_>, window: tauri::WebviewWindow) -> Result<bo
         return Ok(false);
     }
     window.show().map_err(|e| e.to_string())?;
-    window.unminimize().map_err(|e| e.to_string())?;
-    window.set_focus().map_err(|e| e.to_string())?;
+    #[cfg(desktop)]
+    {
+        window.unminimize().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+    }
     crate::tray::set_main_visible(window.app_handle(), true);
     Ok(true)
 }
@@ -2526,6 +2536,7 @@ pub fn can_self_update(app: tauri::AppHandle) -> bool {
 /// The beta channel's manifest. `beta` is a permanent prerelease holding nothing but this file, and
 /// the release workflows move it to the newest release candidate, or to the newest release once that
 /// is ahead, so the URL never changes.
+#[cfg_attr(mobile, allow(dead_code))]
 const BETA_MANIFEST: &str =
     "https://github.com/SimoHypers/limusic/releases/download/beta/latest.json";
 
@@ -2551,26 +2562,35 @@ pub struct BetaUpdate {
 /// by itself, so a lower version there is a beta rollback somebody made on purpose.
 #[tauri::command]
 pub async fn check_beta_update(webview: tauri::Webview) -> Result<Option<BetaUpdate>, String> {
-    use tauri::Manager;
-    use tauri_plugin_updater::UpdaterExt;
-    let url = tauri::Url::parse(BETA_MANIFEST).map_err(|e| e.to_string())?;
-    let update = webview
-        .updater_builder()
-        .endpoints(vec![url])
-        .map_err(|e| e.to_string())?
-        .version_comparator(|current, remote| remote.version != current)
-        .build()
-        .map_err(|e| e.to_string())?
-        .check()
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(update.map(|u| BetaUpdate {
-        current_version: u.current_version.clone(),
-        version: u.version.clone(),
-        body: u.body.clone(),
-        raw_json: u.raw_json.clone(),
-        rid: webview.resources_table().add(u),
-    }))
+    // The Android build is side-loaded, so there is no updater to hand a beta to.
+    #[cfg(mobile)]
+    {
+        let _ = webview;
+        return Ok(None);
+    }
+    #[cfg(desktop)]
+    {
+        use tauri::Manager;
+        use tauri_plugin_updater::UpdaterExt;
+        let url = tauri::Url::parse(BETA_MANIFEST).map_err(|e| e.to_string())?;
+        let update = webview
+            .updater_builder()
+            .endpoints(vec![url])
+            .map_err(|e| e.to_string())?
+            .version_comparator(|current, remote| remote.version != current)
+            .build()
+            .map_err(|e| e.to_string())?
+            .check()
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(update.map(|u| BetaUpdate {
+            current_version: u.current_version.clone(),
+            version: u.version.clone(),
+            body: u.body.clone(),
+            raw_json: u.raw_json.clone(),
+            rid: webview.resources_table().add(u),
+        }))
+    }
 }
 
 /// Open a link from the UI in the real browser. An `<a href>` inside the webview would navigate
@@ -2725,7 +2745,14 @@ pub fn theater_fullscreen(window: tauri::WebviewWindow, on: bool) -> Result<(), 
         return Ok(());
     }
 
-    #[cfg(not(target_os = "windows"))]
+    // Android: immersive mode (status and navigation bars hidden) from the Kotlin side.
+    #[cfg(mobile)]
+    {
+        let _ = &window;
+        player::bridge::send("app.immersive", serde_json::json!({ "on": on }));
+        Ok(())
+    }
+    #[cfg(all(desktop, not(target_os = "windows")))]
     {
         window.set_fullscreen(on).map_err(|e| e.to_string())
     }

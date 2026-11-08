@@ -11,6 +11,7 @@
 //!
 //! Both backends expose the same two entry points — [`init`] and [`set_playing`] — so lib.rs
 //! never learns which one is live.
+#![cfg_attr(mobile, allow(dead_code))]
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -45,12 +46,15 @@ pub fn set_available(val: bool) {
 /// they can't drift apart.
 pub fn show_main(app: &AppHandle) {
     crate::mini::close(app);
+    #[cfg(desktop)]
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
         set_main_visible(app, true);
     }
+    #[cfg(mobile)]
+    player::bridge::send("app.bringToFront", serde_json::Value::Null);
 }
 
 /// Tell the main window's SPA whether anyone can see it.
@@ -224,7 +228,23 @@ mod imp {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+/// Android: no tray. The media notification is the "app keeps playing in the background"
+/// surface there, and it is owned by the Kotlin playback service.
+#[cfg(mobile)]
+mod imp {
+    use tauri::AppHandle;
+
+    pub fn init(_app: &AppHandle) -> tauri::Result<()> {
+        super::set_available(false);
+        Ok(())
+    }
+
+    pub fn set_playing(_app: &AppHandle, _playing: bool) {}
+
+    pub fn set_icon(_app: &AppHandle, _icon: &tauri::image::Image<'_>) {}
+}
+
+#[cfg(all(desktop, not(target_os = "linux")))]
 mod imp {
     use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
     use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};

@@ -8,10 +8,22 @@ license.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 tracing = { workspace = true }
 thiserror = { workspace = true }
-# libmpv2 is the maintained fork of the abandoned `libmpv` crate (adopted in the Phase 0 spike).
+
+# Desktop: libmpv. libmpv2 is the maintained fork of the abandoned `libmpv` crate (adopted in the
+# Phase 0 spike).
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 libmpv2 = "4"
 libmpv2-sys = "4"
 libc = "0.2"
+
+# Phones: the engine lives on the native side (Media3 ExoPlayer in Kotlin, AVFoundation in Swift),
+# driven by JSON commands.
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+serde_json = { workspace = true }
+
+# Same jni version tauri itself uses on Android.
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time"] }

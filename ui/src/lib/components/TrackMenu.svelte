@@ -25,7 +25,9 @@
 		DashboardSquare02Icon,
 		Share08Icon,
 		PreferenceVerticalIcon,
-		PencilEdit02Icon
+		PencilEdit02Icon,
+		Download04Icon,
+		Delete02Icon
 	} from '@hugeicons/core-free-icons';
 	import * as api from '$lib/api';
 	import type { SongItem } from '$lib/api';
@@ -57,6 +59,8 @@
 	import { listenbrainz } from '$lib/listenbrainz.svelte';
 	import { lt } from '$lib/lt.svelte';
 	import { t } from '$lib/i18n.svelte';
+	import { isPhone } from '$lib/mobile.svelte';
+	import { download, isDownloaded, isQueued, removeDownloads } from '$lib/downloads.svelte';
 	import { invalidateCachedPrefix } from '$lib/pagecache';
 	import TempoPitchDialog from './TempoPitchDialog.svelte';
 
@@ -255,6 +259,26 @@
 			>
 				<HugeiconsIcon icon={ArrowDownWideNarrowIcon} class="h-4 w-4" /> {t('player.add_to_queue')}
 			</button>
+		{/if}
+		<!-- Offline on the phone (downloads.rs): the same stream, kept on the device. -->
+		{#if isPhone && !isLocal}
+			{#if isDownloaded(song.video_id)}
+				<button
+					class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent/10"
+					onclick={(e) => run(e, () => removeDownloads([song.video_id]))}
+				>
+					<HugeiconsIcon icon={Delete02Icon} class="h-4 w-4" /> {t('downloads.remove')}
+				</button>
+			{:else}
+				<button
+					class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent/10"
+					disabled={isQueued(song.video_id)}
+					onclick={(e) => run(e, () => download([song]))}
+				>
+					<HugeiconsIcon icon={Download04Icon} class="h-4 w-4" />
+					{isQueued(song.video_id) ? t('downloads.downloading') : t('downloads.download')}
+				</button>
+			{/if}
 		{/if}
 		<!-- Radio is the one action worth having in the player bar too (`linksOnly`): it's how you
 		     say "keep going with more like this" about the song that's playing. -->

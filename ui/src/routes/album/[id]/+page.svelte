@@ -14,6 +14,7 @@
         Share08Icon,
         BookmarkAdd02Icon,
         BookmarkCheck02Icon,
+        Download04Icon
     } from "@hugeicons/core-free-icons";
     import TrackRow from "$lib/components/TrackRow.svelte";
     import TrackColumns, { chosen } from "$lib/components/TrackColumns.svelte";
@@ -50,6 +51,8 @@
     import { thumb } from "$lib/thumb";
     import { anchorMenu, fitMenu, NO_ANCHOR, toBody } from "$lib/menu";
     import { t } from "$lib/i18n.svelte";
+    import { isPhone } from "$lib/mobile.svelte";
+    import { download } from "$lib/downloads.svelte";
 
     let album = $state<AlbumPage | null>(null);
     let loading = $state(true);
@@ -260,24 +263,28 @@
             ></div>
         </div>
 
+        <!-- Not on a phone: an album is a screenful of tracks, and the box would push the cover down. -->
+        {#if !isPhone}
         <div class="absolute right-6 top-6 z-10">
             <TrackFilter bind:value={query} placeholder={t("common.search_this_album")} />
         </div>
+        {/if}
 
-        <div class="relative flex flex-col gap-5 p-6 pt-10">
-            <div class="flex items-end gap-5">
+        <div class="relative flex flex-col gap-5 p-6 pt-10 phone:gap-4 phone:px-4 phone:pt-5">
+            <!-- Phone: cover on top, everything centred under it (YouTube Music's album page). -->
+            <div class="flex items-end gap-5 phone:flex-col phone:items-center phone:gap-4 phone:text-center">
                 <!-- Inline width/height so the size holds even against a stale dev-server CSS that -->
                 <!-- hasn't regenerated a newly-used spacing utility (would fall back to intrinsic size). -->
                 {#if album.thumbnail}
                     <img
                         src={thumb(album.thumbnail, 400)}
                         alt=""
-                        style="width:7rem;height:7rem"
+                        style={isPhone ? "width:13rem;height:13rem" : "width:7rem;height:7rem"}
                         class="shrink-0 rounded-xl object-cover shadow-2xl"
                     />
                 {:else}
                     <div
-                        style="width:7rem;height:7rem"
+                        style={isPhone ? "width:13rem;height:13rem" : "width:7rem;height:7rem"}
                         class="shrink-0 rounded-xl bg-muted"
                     ></div>
                 {/if}
@@ -288,12 +295,12 @@
                         {album.subtitle ?? "Album"}
                     </div>
                     <h1
-                        class="mt-1 font-heading text-4xl font-bold tracking-tight drop-shadow"
+                        class="mt-1 font-heading text-4xl font-bold tracking-tight drop-shadow phone:text-[1.75rem] phone:leading-tight"
                     >
                         {album.title ?? "Album"}
                     </h1>
                     <div
-                        class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground"
+                        class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground phone:justify-center"
                     >
                         {#if album.explicit}
                             <ExplicitIcon class="h-4 w-4 shrink-0" />
@@ -324,7 +331,7 @@
             </div>
 
             {#if album.description}
-                <div class="max-w-2xl">
+                <div class="max-w-2xl phone:text-center">
                     <p
                         class="text-sm text-foreground/80 {expanded
                             ? ''
@@ -342,9 +349,9 @@
             {/if}
 
             <!-- Controls -->
-            <div class="relative flex items-center gap-3">
+            <div class="relative flex items-center gap-3 phone:justify-center phone:gap-2">
                 <button
-                    class="flex cursor-pointer items-center gap-2 rounded-full text-foreground bg-primary px-6 py-2.5 text-sm font-semibold transition hover:opacity-90 disabled:opacity-50"
+                    class="flex cursor-pointer items-center gap-2 rounded-full bg-primary px-6 py-2.5 text-primary-foreground text-sm font-semibold transition hover:opacity-90 disabled:opacity-50"
                     onclick={() => playAll(null)}
                     disabled={!album.items.length}
                 >
@@ -357,11 +364,22 @@
                 >
                     <HugeiconsIcon icon={ShuffleIcon} class="h-4 w-4" /> {t("common.shuffle")}
                 </button>
+                {#if isPhone && !isLocal}
+                    <button
+                        class="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border transition hover:bg-accent/10 disabled:opacity-50"
+                        onclick={() => album && download(album.items)}
+                        disabled={!album.items.length}
+                        aria-label={t("downloads.download_all")}
+                    >
+                        <HugeiconsIcon icon={Download04Icon} class="h-4 w-4" />
+                    </button>
+                {/if}
                 <!-- Local albums are already in the Local tab; everything else is savable, signed
                      in or not. -->
                 {#if !isLocal}
                     <button
-                        class="flex cursor-pointer items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition hover:bg-accent/10 disabled:opacity-50"
+                        class="flex cursor-pointer items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition hover:bg-accent/10 disabled:opacity-50 phone:size-10 phone:justify-center phone:px-0"
+                        aria-label={inLibrary ? t("library.in_library") : t("library.save_to_library")}
                         class:border-primary={inLibrary}
                         class:text-primary={inLibrary}
                         onclick={toggleLibrary}
@@ -374,7 +392,7 @@
                             showAlt={inLibrary}
                             class="h-4 w-4"
                         />
-                        {inLibrary ? t("library.in_library") : t("library.save_to_library")}
+                        <span class="phone:hidden">{inLibrary ? t("library.in_library") : t("library.save_to_library")}</span>
                     </button>
                 {/if}
                 <TrackSelectButton
