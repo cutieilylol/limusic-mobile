@@ -13,8 +13,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use innertube::{
-    find_format, find_video_format, rustypipe_fallback, AudioQuality, Clients, Format, InnerTube,
-    PlayerResponse, StreamingData, YouTubeClient, MAIN_CLIENT, STREAM_FALLBACK_ORDER,
+    find_format, find_video_format, plays_here, rustypipe_fallback, AudioQuality, Clients, Format,
+    InnerTube, PlayerResponse, StreamingData, YouTubeClient, MAIN_CLIENT, STREAM_FALLBACK_ORDER,
     UPLOAD_FALLBACK_ORDER,
 };
 use tokio::sync::Mutex;
@@ -298,7 +298,9 @@ impl Orchestrator {
         let has_high = main_resp
             .as_ref()
             .and_then(|r| r.streaming_data.as_ref())
-            .is_some_and(|s| s.adaptive_formats.iter().any(is_high));
+            .is_some_and(|s| {
+                s.adaptive_formats.iter().any(|f| is_high(f) && plays_here(&f.mime_type))
+            });
         let mut audio_config_loudness = main_resp.as_ref().and_then(main_loudness);
         // Prefer main's tracking block: a ping sent as WEB_REMIX is what registers the play as a
         // YouTube *Music* one. But `playbackTracking` is only present on an OK response, so when

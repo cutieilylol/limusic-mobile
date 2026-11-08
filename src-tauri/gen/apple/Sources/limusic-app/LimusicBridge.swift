@@ -121,8 +121,10 @@ final class AppChrome: NSObject, ASWebAuthenticationPresentationContextProviding
             let steps: [(Double, String)] = [
                 (22, layout),
                 (30, state),
+                (32, "window.__TAURI_INTERNALS__.invoke('diagnostics').then(r=>window.__diag=r,e=>window.__diag='ERR '+e);1"),
                 (40, go("/search")),
                 (46, go("/library")),
+                (50, "(window.__diag||'pending').length+' '+(window.__diag||'pending').slice(0,160)"),
                 (52, state),
             ]
             // YouTube turns away the Simulator's cloud IP, so audio is tried on a file in YouTube's

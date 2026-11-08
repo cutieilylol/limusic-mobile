@@ -250,10 +250,12 @@ pub fn find_format(data: &StreamingData, quality: AudioQuality) -> Option<&Forma
     // before anything else: a dub is never the better stream, at any bitrate.
     let original: Vec<&Format> = audio.iter().copied().filter(|f| f.is_original()).collect();
     let audio = if original.is_empty() { audio } else { original };
-    // Before the quality ranking: it scores Opus highest, and iOS can't open a WebM at all.
-    let playable: Vec<&Format> =
-        audio.iter().copied().filter(|f| plays_here(&f.mime_type)).collect();
-    let audio = if playable.is_empty() { audio } else { playable };
+    // Before the quality ranking: it scores Opus highest, and iOS can't open a WebM at all. With
+    // nothing it can play, this client is no use here and the caller moves on to the next.
+    let audio: Vec<&Format> = audio.into_iter().filter(|f| plays_here(&f.mime_type)).collect();
+    if audio.is_empty() {
+        return None;
+    }
     match quality {
         AudioQuality::High | AudioQuality::Auto => audio.into_iter().max_by(|a, b| {
             a.quality_rank()
