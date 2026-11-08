@@ -37,8 +37,7 @@ if (isAndroid) {
 }
 if (isIOS) {
 	document.documentElement.classList.add('ios');
-	// Under the notch and the home bar (`:root.ios` in layout.css pads for them), and no zooming
-	// in on a text field the moment it takes focus.
+	// No zooming in on a text field the moment it takes focus.
 	document
 		.querySelector('meta[name=viewport]')
 		?.setAttribute(

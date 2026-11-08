@@ -116,17 +116,31 @@ final class AppChrome: NSObject, ASWebAuthenticationPresentationContextProviding
                 return {ih:innerHeight,vv:visualViewport.height,ch:document.documentElement.clientHeight,probe:o,shell:r(document.querySelector('.h-dvh')),\
                 main:r(document.querySelector('main')),nav:r(document.querySelector('nav')),body:r(document.body),meta:document.querySelector('meta[name=viewport]').content,cls:document.documentElement.className}})())
                 """
-            let state = "JSON.stringify({path:location.pathname,text:document.body.innerText.slice(0,300)})"
+            let state =
+                "JSON.stringify({href:location.href,tab:document.querySelector('nav a[aria-current]')?.getAttribute('href'),text:document.body.innerText.slice(0,200)})"
             let steps: [(Double, String)] = [
-                (20, layout),
-                (22, "(()=>{const r=document.querySelector('main [data-ctx][role=button]');r&&r.click();return r?r.innerText.slice(0,60):'no row'})()"),
-                (36, state),
-                (46, state),
-                (47, "(()=>{const b=document.querySelector('button[aria-label=\"Minimize player\"]');b&&b.click();return !!b})()"),
-                (50, go("/search")),
-                (55, go("/library")),
-                (60, state),
+                (22, layout),
+                (30, state),
+                (40, go("/search")),
+                (46, go("/library")),
+                (52, state),
             ]
+            // YouTube turns away the Simulator's cloud IP, so audio is tried on a file in YouTube's
+            // own container, served the way the audio proxy serves it: load, a queued lookahead
+            // for the gapless path, and a look at the player as it crosses the boundary.
+            if let url = ProcessInfo.processInfo.environment["LIMUSIC_SMOKE"], url.hasPrefix("http") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 24) {
+                    let engine = PlayerEngine.shared
+                    engine.command("player.load", ["url": url, "headers": [String: String]()])
+                    engine.command("player.enqueue", ["url": url])
+                    engine.command("player.play", [:])
+                }
+                for delay in stride(from: 26.0, through: 46.0, by: 2.0) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                        NSLog("SMOKE audio t=%.0f %@", delay, PlayerEngine.shared.smokeDescription())
+                    }
+                }
+            }
             for (delay, js) in steps {
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                     guard let web = self?.mainWebView() else {
@@ -161,6 +175,11 @@ final class AppChrome: NSObject, ASWebAuthenticationPresentationContextProviding
             web.scrollView.bounces = false
             web.allowsBackForwardNavigationGestures = true
             web.allowsLinkPreview = false
+            // WebKit measured the page before the insets changed, and only measures again when
+            // its frame does: left alone the page stops a safe area short of the bottom.
+            let frame = web.frame
+            web.frame = frame.insetBy(dx: 0, dy: 1)
+            DispatchQueue.main.async { web.frame = frame }
         } else if attempt < 100 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.configureWebViewWhenReady(attempt: attempt + 1)

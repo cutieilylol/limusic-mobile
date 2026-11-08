@@ -12,8 +12,10 @@
 		{ href: '/library', label: t('nav.library'), icon: LibraryIcon },
 		{ href: '/stats', label: t('nav.stats'), icon: Chart02Icon }
 	]);
-	const isActive = (href: string) =>
-		href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href);
+	// iOS starts the app at the bare `tauri://localhost`, which has no path until the first
+	// navigation gives it one.
+	const path = $derived(page.url.pathname.replace(/\/index\.html$/, '') || '/');
+	const isActive = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
 </script>
 
 <nav

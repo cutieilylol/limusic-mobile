@@ -66,6 +66,18 @@ final class PlayerEngine: NSObject {
         setUpRemoteCommands()
     }
 
+    #if DEBUG
+        func smokeDescription() -> String {
+            let d = live
+            let item = d.player.currentItem
+            return "items=\(d.player.items().count) status=\(item?.status.rawValue ?? -1)"
+                + " time=\(d.player.currentTime().seconds) dur=\(d.durationSecs)"
+                + " rate=\(d.player.rate) tc=\(d.player.timeControlStatus.rawValue)"
+                + " wait=\(d.player.reasonForWaitingToPlay?.rawValue ?? "-")"
+                + " playing=\(d.playing) error=\(String(describing: item?.error))"
+        }
+    #endif
+
     // MARK: Commands from Rust
 
     func command(_ cmd: String, _ o: Json) {
