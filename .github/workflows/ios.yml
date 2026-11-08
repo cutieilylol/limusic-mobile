@@ -1,7 +1,7 @@
 name: iOS
 
 # The iPhone build. Xcode only exists on a Mac and this project is developed on Windows, so every
-# compile happens here. Manual only: a macOS minute costs ten of the free allowance.
+# compile happens here. Manual only: a macOS minute can cost ten of a free allowance.
 #
 #   mode=init  generates src-tauri/gen/apple (artifact `gen-apple`, to be committed by hand) and
 #              reports what the Swift and Rust halves make of the iOS SDK.
