@@ -132,18 +132,18 @@ jobs:
           print(next(d['udid'] for d in devices[runtimes[-1]] if d['name'].startswith('iPhone')))
           ")
           mkdir -p "$RUNNER_TEMP/sim"
-          xcrun simctl boot "$UDID"
-          xcrun simctl bootstatus "$UDID" -b >/dev/null
-          xcrun simctl install "$UDID" "$RUNNER_TEMP/Limusic.app"
-          # An audio file in YouTube's container: DASH-branded fragmented MP4 with a sidx.
+          # An audio file in YouTube's container: DASH-branded fragmented MP4 with a sidx. Before
+          # the Simulator boots, so nothing sits between installing the app and launching it.
           brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
           ffmpeg -nostdin -loglevel error -f lavfi -i "sine=frequency=440:duration=8" -c:a aac -b:a 128k \
             -f mp4 -brand dash -movflags +frag_keyframe+empty_moov+default_base_moof+global_sidx \
             -frag_duration 2000000 "$RUNNER_TEMP/dash.m4a"
           ffprobe -hide_banner "$RUNNER_TEMP/dash.m4a" 2>&1 | tee "$RUNNER_TEMP/sim/ffprobe.txt" | grep -E "major_brand|Duration|Audio"
           python3 scripts/ios-smoke-server.py "$RUNNER_TEMP/dash.m4a" 8765 "$RUNNER_TEMP/sim/requests.log" &
-          SIMCTL_CHILD_LIMUSIC_SMOKE=http://127.0.0.1:8765/dash.m4a xcrun simctl launch --console-pty \
-            "$UDID" "$BUNDLE_ID" > "$RUNNER_TEMP/sim/console.log" 2>&1 &
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b >/dev/null
+          xcrun simctl install "$UDID" "$RUNNER_TEMP/Limusic.app"
+          SIMCTL_CHILD_LIMUSIC_SMOKE=http://127.0.0.1:8765/dash.m4a xcrun simctl launch "$UDID" "$BUNDLE_ID"
           # In step with runSmokeSteps in LimusicBridge.swift, which starts some seconds after this.
           shot() { xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/sim/$1.png"; }
           sleep 36; shot home
